@@ -51,7 +51,7 @@ namespace MidiToBGB {
             TransferQueue.Enqueue(packet);
         }
 
-        protected virtual void ReceiveLoop() {
+        private void ReceiveLoop() {
             byte[] buffer = new byte[BGBPacket.Size];
             while (Client?.Connected ?? false) {
                 Thread.Sleep(0);
@@ -71,7 +71,7 @@ namespace MidiToBGB {
             }
         }
 
-        protected virtual void TransferLoop() {
+        private void TransferLoop() {
             while (Client?.Connected ?? false) {
                 Thread.Sleep(0);
                 if (TransferQueue.Count == 0)

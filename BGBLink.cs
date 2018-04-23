@@ -34,12 +34,9 @@ namespace MidiToBGB {
 
         private bool Handshaked = false;
 
-        public BGBLink() {
+        public BGBLink(string hostname = "127.0.0.1", int port = 8765) {
             Client = new BGBLinkClient();
             Client.OnReceive += HandlePacket;
-        }
-
-        public void Connect(string hostname = "127.0.0.1", int port = 8765) {
             Client.Connect(hostname, port);
             Client.Send(new BGBPacket(CmdVersion, 1, 4, 0, 0));
         }
