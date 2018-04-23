@@ -66,12 +66,11 @@ namespace MidiToBGB {
             caps = InputDevice.GetDeviceCapabilities(inputId);
             Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
             using (InputDevice input = new InputDevice(inputId)) {
-                Console.WriteLine("Connected.");
 
                 Console.WriteLine($"Connecting to BGB {host} {port}");
                 using (BGBLink link = new BGBLink(host, port)) {
-                    Console.WriteLine("Connected.");
 
+                    Console.WriteLine("Starting bridge.");
                     using (MidiToBGBBridge bridge = new MidiToBGBBridge(input, link)) {
                         while (link.Client.Client.Connected && !input.IsDisposed)
                             Thread.Sleep(0);
