@@ -28,7 +28,7 @@ namespace MidiToBGB {
         private void HandleMIDI(IMidiMessage msg) {
             lock (BGB) {
                 foreach (byte data in msg.GetBytes()) {
-                    BGB.SendMaster(data);
+                    BGB.Send(data);
                 }
             }
         }

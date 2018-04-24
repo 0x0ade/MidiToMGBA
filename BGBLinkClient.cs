@@ -78,19 +78,18 @@ namespace MidiToBGB {
                 if (TransferQueue.Count == 0)
                     continue;
 
-                lock (TransferQueue) {
-                    while (TransferQueue.Count > 0) {
-                        BGBPacket packet = TransferQueue.Dequeue();
-                        byte[] buffer = packet.Bytes;
+                while (TransferQueue.Count > 0) {
+                    BGBPacket packet = TransferQueue.Dequeue();
+                    byte[] buffer = packet.Bytes;
 
-                        try {
-                            Stream.Write(buffer, 0, buffer.Length);
-                        } catch (Exception e) {
-                            Console.WriteLine("[BGB] [ERROR] Writing BGBPacket failed");
-                            Console.WriteLine(e);
-                            Dispose();
-                            return;
-                        }
+                    try {
+                        Stream.Write(buffer, 0, buffer.Length);
+                        Stream.Flush();
+                    } catch (Exception e) {
+                        Console.WriteLine("[BGB] [ERROR] Writing BGBPacket failed");
+                        Console.WriteLine(e);
+                        Dispose();
+                        return;
                     }
                 }
             }

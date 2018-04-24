@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 namespace MidiToBGB {
     public class BGBLink : IDisposable {
 
+        // BGB documentation: http://bgb.bircd.org/bgblink.html
+
         #region Status constants
 
         public const byte StatusRunning = 0x01;
@@ -20,20 +22,46 @@ namespace MidiToBGB {
         #endregion
 
         public BGBLinkClient Client;
-
-        public int Time {
-            get {
-                // TODO: Fix timing.
-                return 0x7FFFFFFF & ((int) (Clock.ElapsedTicks * 0.7649));
-            }
-        }
-
         private bool Handshaked = false;
+
+        public event Action<byte> OnReceive;
 
         private Stopwatch Clock;
         private int TimeBGB;
 
-        public event Action<byte> OnReceive;
+        private int Offset;
+
+        public int Time {
+            get {
+                // TODO: Fix timing.
+
+                long time;
+
+                // BGB doc: http://bgb.bircd.org/bgblink.html
+
+                // Technically accurate calculation, but BGB's timing documentation seems to lie..?!
+                /*/
+                time = Clock.ElapsedTicks;
+                // BGB doc: Both sides maintain a "timestamp", which is in 2 MiHz clocks (2^21 cycles per second).
+                const long cyclesPerSecond = 2097152;
+                // MSDN: A single tick represents one hundred nanoseconds or one ten-millionth of a second. There are 10,000 ticks in a millisecond, or 10 million ticks in a second.
+                time = (time * cyclesPerSecond) / TimeSpan.TicksPerSecond;
+                /**/
+
+                // Estimated syncing factor. Desyncs after a while, but close enough for the first few seconds.
+                // time = (long) (Clock.ElapsedTicks * 0.7649);
+
+                // BGB's timestamp is an increment of 2048.
+                // This hack "works" well enough, but requires a few seconds for BGB to get in sync.
+                // time = Offset * 2048;
+                // Adding BGB's time causes this to sync up almost immediately.
+                time = TimeBGB + Offset * 2048;
+                // Using a smaller "step" than 2048 introduces dropouts.
+
+                // BGB doc: Timestamps only contain the lowest 31 bits, the highest bit is always 0. Timestamps can wrap over.
+                return 0x7FFFFFFF & ((int) time);
+            }
+        }
 
         public BGBLink(string hostname = "127.0.0.1", int port = 8765) {
             Clock = new Stopwatch();
@@ -74,15 +102,15 @@ namespace MidiToBGB {
                     break;
 
                 case BGBCommand.Sync2:
-                    Console.WriteLine($"[BGB] [RX] [SYNC2] 0x{packet.B2.ToString("X2")}");
+                    // Console.WriteLine($"[BGB] [RX] [SYNC2] 0x{packet.B2.ToString("X2")}");
                     OnReceive?.Invoke(packet.B2);
                     break;
 
                 case BGBCommand.Sync3:
                     if (packet.B2 == 0x00) {
                         int time = Time;
-                        // Console.WriteLine($"[BGB] [TIME] BGB: {packet.I1}; self: {time}; self - BGB: {time - packet.I1}");
-                        SendTime();
+                        // Console.WriteLine($"[BGB] [TIME] BGB: {packet.I1}; self: {time}; BGB - self: {packet.I1 - time}");
+                        Sync();
                     }
                     break;
 
@@ -117,19 +145,20 @@ namespace MidiToBGB {
             ));
         }
 
-        public void SendMaster(byte data) {
-            Console.WriteLine($"[BGB] [TX] [SYNC1] 0x{data}");
+        public void Send(byte data) {
+            int time = Time;
+            Console.WriteLine($"[BGB] [TX] [SYNC1] 0x{data} {time}");
             Client.Send(new BGBPacket(
                 BGBCommand.Sync1,
                 data,
-                // 0x81 is required. 0x02 is "high speed", 0x04 is "double speed"
-                0x81 | 0x02, // | 0x04,
+                0x81,
                 0,
                 Time
             ));
+            Offset++;
         }
 
-        public void SendSlave(byte data) {
+        public void Respond(byte data) {
             Client.Send(new BGBPacket(
                 BGBCommand.Sync2,
                 data,
@@ -139,7 +168,7 @@ namespace MidiToBGB {
             ));
         }
 
-        public void SendTime() {
+        public void Sync() {
             Client.Send(new BGBPacket(
                 BGBCommand.Sync3,
                 0x00,
