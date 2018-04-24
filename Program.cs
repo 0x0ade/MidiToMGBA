@@ -10,8 +10,6 @@ using Sanford.Multimedia.Midi;
 namespace MidiToBGB {
     class Program {
 
-        // TODO: Documentation.
-
         static void Main(string[] args) {
             Console.WriteLine($"MidiToBGB {Assembly.GetExecutingAssembly().GetName().Version}");
 
@@ -33,13 +31,22 @@ namespace MidiToBGB {
                 string arg = argQueue.Dequeue();
                 if (arg == "--midi") {
                     string inputName = argQueue.Dequeue().ToLowerInvariant();
+                    if (inputName == "list") {
+                        for (int i = 0; i < inputId; i++) {
+                            caps = InputDevice.GetDeviceCapabilities(i);
+                            Console.WriteLine($"#{i}: {caps.name.Replace(" ", "")}");
+                        }
+                        Console.WriteLine("Press any key to exit.");
+                        Console.ReadKey();
+                        return;
+                    }
                     if (!int.TryParse(inputName, out inputId)) {
                         inputId = -1;
                     }
                     if (inputId == -1) {
                         for (int i = 0; i < inputId; i++) {
                             caps = InputDevice.GetDeviceCapabilities(i);
-                            if (caps.name.ToLowerInvariant() == inputName) {
+                            if (caps.name.ToLowerInvariant().Replace(" ", "") == inputName) {
                                 inputId = i;
                                 break;
                             }
