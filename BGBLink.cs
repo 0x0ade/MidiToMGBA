@@ -101,7 +101,7 @@ namespace MidiToBGB {
                     break;
 
                 case BGBCommand.Sync2:
-                    // Console.WriteLine($"[BGB] [RX] [SYNC2] 0x{packet.B2.ToString("X2")}");
+                    Console.WriteLine($"[BGB] [RX] [SYNC2] 0x{packet.B2.ToString("X2")}");
                     OnReceive?.Invoke(packet.B2);
                     break;
 
