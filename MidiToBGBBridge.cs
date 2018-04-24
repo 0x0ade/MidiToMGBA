@@ -37,22 +37,17 @@ namespace MidiToBGB {
         }
 
         private void HandleChannelMessageReceived(object sender, ChannelMessageEventArgs e) {
-            Console.WriteLine("Received channel message");
-            Console.WriteLine($"{e.Message.Command} @ {e.Message.MidiChannel}, {e.Message.Data1} {e.Message.Data2}");
+            foreach (byte b in e.Message.GetBytes()) {
+                BGB.SendMaster(b);
+            }
         }
 
         private void HandleSysCommonMessageReceived(object sender, SysCommonMessageEventArgs e) {
-            Console.WriteLine("Received syscommon message");
-            Console.WriteLine($"{e.Message.SysCommonType}, {e.Message.Data1} {e.Message.Data2}");
+
         }
 
         private void HandleSysExMessageReceived(object sender, SysExMessageEventArgs e) {
-            Console.WriteLine("Received sysex message");
-            foreach (byte b in e.Message) {
-                Console.Write(b.ToString("X2"));
-                Console.Write(" ");
-            }
-            Console.WriteLine();
+
         }
 
         private void HandleSysRealtimeMessageReceived(object sender, SysRealtimeMessageEventArgs e) {
@@ -66,13 +61,10 @@ namespace MidiToBGB {
                 FDiffTimeStamp = 60000.0 / (timestamp - FLastTimestamp);
                 FLastTimestamp = timestamp;
             }
-
-            Console.WriteLine("Received sysrealtime message");
-            Console.WriteLine($"{e.Message.SysRealtimeType}, {FDiff.ToString("F4")} {FDiffTimeStamp.ToString("F4")}");
         }
 
         private void HandleError(object sender, ErrorEventArgs e) {
-            Console.WriteLine("MIDI error:");
+            Console.WriteLine("[MIDI] error");
             Console.WriteLine(e.Error);
         }
 

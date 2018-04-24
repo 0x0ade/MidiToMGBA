@@ -11,7 +11,6 @@ namespace MidiToBGB {
     class Program {
 
         // TODO: Documentation.
-        // TODO: Link to http://www.tobias-erichsen.de/software/loopmidi.html
 
         static void Main(string[] args) {
             Console.WriteLine($"MidiToBGB {Assembly.GetExecutingAssembly().GetName().Version}");
@@ -64,17 +63,24 @@ namespace MidiToBGB {
             }
 
             caps = InputDevice.GetDeviceCapabilities(inputId);
-            Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
-            using (InputDevice input = new InputDevice(inputId)) {
-
-                Console.WriteLine($"Connecting to BGB {host} {port}");
-                using (BGBLink link = new BGBLink(host, port)) {
-
-                    Console.WriteLine("Starting bridge.");
-                    using (MidiToBGBBridge bridge = new MidiToBGBBridge(input, link)) {
-                        while (link.Client.Client.Connected && !input.IsDisposed)
-                            Thread.Sleep(0);
+            while (true) {
+                try {
+                    Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
+                    using (InputDevice input = new InputDevice(inputId)) {
+                        Console.WriteLine($"Connecting to BGB {host} {port}");
+                        using (BGBLink link = new BGBLink(host, port)) {
+                            Console.WriteLine("Starting bridge.");
+                            using (MidiToBGBBridge bridge = new MidiToBGBBridge(input, link)) {
+                                while (link.Client.Client.Connected && !input.IsDisposed)
+                                    Thread.Sleep(0);
+                                return;
+                            }
+                        }
                     }
+                } catch (Exception e) {
+                    Console.WriteLine("Error!");
+                    Console.WriteLine(e);
+                    Console.WriteLine("Retrying...");
                 }
             }
 

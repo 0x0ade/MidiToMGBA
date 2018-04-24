@@ -45,6 +45,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BGBCommand.cs" />
     <Compile Include="MidiToBGBBridge.cs" />
     <Compile Include="BGBLink.cs" />
     <Compile Include="BGBLinkClient.cs" />
