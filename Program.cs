@@ -31,20 +31,11 @@ namespace MidiToBGB {
                 string arg = argQueue.Dequeue();
                 if (arg == "--midi") {
                     string inputName = argQueue.Dequeue().ToLowerInvariant();
-                    if (inputName == "list") {
-                        for (int i = 0; i < inputId; i++) {
-                            caps = InputDevice.GetDeviceCapabilities(i);
-                            Console.WriteLine($"#{i}: {caps.name.Replace(" ", "")}");
-                        }
-                        Console.WriteLine("Press any key to exit.");
-                        Console.ReadKey();
-                        return;
-                    }
                     if (!int.TryParse(inputName, out inputId)) {
                         inputId = -1;
                     }
                     if (inputId == -1) {
-                        for (int i = 0; i < inputId; i++) {
+                        for (int i = 0; i < InputDevice.DeviceCount; i++) {
                             caps = InputDevice.GetDeviceCapabilities(i);
                             if (caps.name.ToLowerInvariant().Replace(" ", "") == inputName) {
                                 inputId = i;
@@ -66,6 +57,10 @@ namespace MidiToBGB {
 
             if (inputId == -1) {
                 Console.WriteLine("No --midi ID given, connecting to last connected device.");
+                for (int i = 0; i < InputDevice.DeviceCount; i++) {
+                    caps = InputDevice.GetDeviceCapabilities(i);
+                    Console.WriteLine($"#{i}: {caps.name.Replace(" ", "")}");
+                }
                 inputId = InputDevice.DeviceCount - 1;
             }
 
