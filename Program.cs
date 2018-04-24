@@ -75,7 +75,6 @@ namespace MidiToBGB {
                             using (MidiToBGBBridge bridge = new MidiToBGBBridge(input, link)) {
                                 while (link.Client.Client.Connected && !input.IsDisposed)
                                     Thread.Sleep(0);
-                                return;
                             }
                         }
                     }

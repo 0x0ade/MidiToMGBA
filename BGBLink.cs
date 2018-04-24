@@ -32,7 +32,7 @@ namespace MidiToBGB {
 
         public int Time {
             get {
-                // TODO: Fix timing.
+                // FIXME: Fix BGB link timing.
 
                 long time;
 
@@ -53,11 +53,11 @@ namespace MidiToBGB {
                 // BGB's timestamp is an increment of 2048.
                 // This hack "works" well enough, but requires a few seconds for BGB to get in sync.
                 // time = Offset * 2048;
-                // Adding BGB's time causes this to sync up almost immediately.
-                time = TimeBGB + Offset * 2048;
-                // Using a smaller "step" than 2048 introduces dropouts.
+                // Using a "step" of 2048 or smaller reduces latency, but introduces dropouts.
+                time = Offset * 4096;
 
                 // BGB doc: Timestamps only contain the lowest 31 bits, the highest bit is always 0. Timestamps can wrap over.
+                // Note: BGB's documentation lies. Once the timestamp "wraps over", mGB starts receiving / playing crap.
                 return 0x7FFFFFFF & ((int) time);
             }
         }
