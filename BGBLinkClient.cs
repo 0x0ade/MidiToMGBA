@@ -13,7 +13,7 @@ namespace MidiToBGB {
         public TcpClient Client;
         public NetworkStream Stream;
 
-        protected Queue<BGBPacket> TransferQueue = new Queue<BGBPacket>();
+        protected Queue<BGBPacket> TransferQueue = new Queue<BGBPacket>(2048);
         protected Thread ReceiveThread;
         protected Thread TransferThread;
 
@@ -58,23 +58,16 @@ namespace MidiToBGB {
                 if (Client.Available < BGBPacket.Size)
                     continue;
 
-#if !DEBUG
                 try {
-#endif
-                Stream.Read(buffer, 0, BGBPacket.Size);
-#if !DEBUG
+                    Stream.Read(buffer, 0, BGBPacket.Size);
                 } catch (Exception e) {
-                    Console.WriteLine("Receiving BGBPacket failed");
+                    Console.WriteLine("[BGB] [ERROR] Receiving BGBPacket failed");
                     Console.WriteLine(e);
                     Dispose();
                     return;
                 }
-#endif
 
                 BGBPacket packet = new BGBPacket(buffer);
-#if DEBUG
-                // Console.WriteLine($"[BGB] [RX] {packet}");
-#endif
                 OnReceive?.Invoke(packet);
             }
         }
@@ -88,24 +81,16 @@ namespace MidiToBGB {
                 lock (TransferQueue) {
                     while (TransferQueue.Count > 0) {
                         BGBPacket packet = TransferQueue.Dequeue();
-#if DEBUG
-                        // Console.WriteLine($"[BGB] [TX] {packet}");
-#endif
                         byte[] buffer = packet.Bytes;
 
-#if !DEBUG
                         try {
-#endif
-                        Stream.Write(buffer, 0, buffer.Length);
-                        Stream.Flush();
-#if !DEBUG
+                            Stream.Write(buffer, 0, buffer.Length);
                         } catch (Exception e) {
-                            Console.WriteLine("Transfering BGBPacket failed");
+                            Console.WriteLine("[BGB] [ERROR] Writing BGBPacket failed");
                             Console.WriteLine(e);
                             Dispose();
                             return;
                         }
-#endif
                     }
                 }
             }

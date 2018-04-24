@@ -21,12 +21,19 @@ namespace MidiToBGB {
 
         public BGBLinkClient Client;
 
-        public int Time => 0x7FFFFFFF & ((int) (Clock.ElapsedTicks * 0.75) + TimeBGB);
+        public int Time {
+            get {
+                // TODO: Fix timing.
+                return 0x7FFFFFFF & ((int) (Clock.ElapsedTicks * 0.7649));
+            }
+        }
 
         private bool Handshaked = false;
 
         private Stopwatch Clock;
         private int TimeBGB;
+
+        public event Action<byte> OnReceive;
 
         public BGBLink(string hostname = "127.0.0.1", int port = 8765) {
             Clock = new Stopwatch();
@@ -46,7 +53,7 @@ namespace MidiToBGB {
         public void HandlePacket(BGBPacket packet) {
             if (!Handshaked) {
                 // Version - must be 1, 4, 0, 0
-                Console.WriteLine($"[BGB] [HANDSHAKE] {packet}");
+                Console.WriteLine($"[BGB] [RX] [HANDSHAKE] {packet}");
                 if (packet.Command != BGBCommand.Version ||
                     packet.B2 != 1 ||
                     packet.B3 != 4 ||
@@ -59,27 +66,28 @@ namespace MidiToBGB {
 
             switch (packet.Command) {
                 case BGBCommand.Joypad:
+                    Console.WriteLine($"[BGB] [RX] [JOYPAD] {packet.B2 & 0x07} {((packet.B2 & 0x08) == 0x08 ? "+" : "-")}");
                     break;
 
                 case BGBCommand.Sync1:
+                    Console.WriteLine($"[BGB] [RX] [SYNC1] 0x{packet.B2.ToString("X2")} 0x{packet.B3.ToString("X2")} {packet.I1}");
                     break;
 
                 case BGBCommand.Sync2:
+                    Console.WriteLine($"[BGB] [RX] [SYNC2] 0x{packet.B2.ToString("X2")}");
+                    OnReceive?.Invoke(packet.B2);
                     break;
 
                 case BGBCommand.Sync3:
                     if (packet.B2 == 0x00) {
                         int time = Time;
                         // Console.WriteLine($"[BGB] [TIME] BGB: {packet.I1}; self: {time}; self - BGB: {time - packet.I1}");
-                        Clock.Stop();
-                        Clock.Reset();
-                        TimeBGB = packet.I1;
-                        Clock.Start();
                         SendTime();
                     }
                     break;
 
                 case BGBCommand.Status:
+                    Console.Write("[BGB] [RX] [STATUS] ");
                     if ((packet.B2 & StatusRunning) == StatusRunning)
                         Console.Write("running ");
                     if ((packet.B2 & StatusPaused) == StatusPaused)
@@ -110,10 +118,12 @@ namespace MidiToBGB {
         }
 
         public void SendMaster(byte data) {
+            Console.WriteLine($"[BGB] [TX] [SYNC1] 0x{data}");
             Client.Send(new BGBPacket(
                 BGBCommand.Sync1,
                 data,
-                0x81,
+                // 0x81 is required. 0x02 is "high speed", 0x04 is "double speed"
+                0x81 | 0x02, // | 0x04,
                 0,
                 Time
             ));

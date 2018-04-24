@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using Sanford.Multimedia;
+using System.Collections.ObjectModel;
 using Sanford.Multimedia.Midi;
 
 namespace MidiToBGB {
@@ -15,10 +15,18 @@ namespace MidiToBGB {
         static void Main(string[] args) {
             Console.WriteLine($"MidiToBGB {Assembly.GetExecutingAssembly().GetName().Version}");
 
+            if (InputDevice.DeviceCount == 0) {
+                Console.WriteLine("No MIDI input device found.");
+                Console.WriteLine("If you want to control BGB from your DAW, use http://www.tobias-erichsen.de/software/loopmidi.html");
+                Console.WriteLine("Press any key to exit.");
+                Console.ReadKey();
+                return;
+            }
+
             MidiInCaps caps;
             int inputId = -1;
-            string host = "127.0.0.1";
-            int port = 8765;
+            string bgbHost = "127.0.0.1";
+            int bgbPort = 8765;
 
             Queue<string> argQueue = new Queue<string>(args);
             while (argQueue.Count > 0) {
@@ -44,8 +52,8 @@ namespace MidiToBGB {
                     }
 
                 } else if (arg == "--bgb") {
-                    host = argQueue.Dequeue();
-                    port = int.Parse(argQueue.Dequeue());
+                    bgbHost = argQueue.Dequeue();
+                    bgbPort = int.Parse(argQueue.Dequeue());
                 }
             }
 
@@ -54,21 +62,13 @@ namespace MidiToBGB {
                 inputId = InputDevice.DeviceCount - 1;
             }
 
-            if (inputId == -1) {
-                Console.WriteLine("No MIDI input device found.");
-                Console.WriteLine("If you want to control BGB from your DAW, use http://www.tobias-erichsen.de/software/loopmidi.html");
-                Console.WriteLine("Press any key to exit.");
-                Console.ReadKey();
-                return;
-            }
-
             caps = InputDevice.GetDeviceCapabilities(inputId);
             while (true) {
                 try {
                     Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
                     using (InputDevice input = new InputDevice(inputId)) {
-                        Console.WriteLine($"Connecting to BGB {host} {port}");
-                        using (BGBLink link = new BGBLink(host, port)) {
+                        Console.WriteLine($"Connecting to BGB {bgbHost} {bgbPort}");
+                        using (BGBLink link = new BGBLink(bgbHost, bgbPort)) {
                             Console.WriteLine("Starting bridge.");
                             using (MidiToBGBBridge bridge = new MidiToBGBBridge(input, link)) {
                                 while (link.Client.Client.Connected && !input.IsDisposed)
@@ -83,7 +83,6 @@ namespace MidiToBGB {
                     Console.WriteLine("Retrying...");
                 }
             }
-
         }
 
     }
