@@ -8,6 +8,7 @@ using static MidiToMGBA.MGBA;
 using MonoMod.RuntimeDetour;
 using System.Reflection.Emit;
 using System.Threading;
+using System.Diagnostics;
 
 namespace MidiToMGBA {
     public unsafe class MGBALink : IDisposable {
@@ -44,6 +45,7 @@ namespace MidiToMGBA {
                 Driver->writeSB = WriteSB;
                 Driver->writeSC = WriteSC;
             }
+
             Links.Add(this);
         }
 
@@ -51,10 +53,21 @@ namespace MidiToMGBA {
             lock (this) {
                 if ((IntPtr) SIO == IntPtr.Zero)
                     return;
-                while (SIO->remainingBits != 0) {
-                    Console.WriteLine($"Waiting - {SIO->remainingBits} bits left.");
-                    Thread.Sleep(100);
+
+                // Note to future self: This keeps hanging. Does _GBSIOProcessEvents even run?!
+                int prevBits = 0;
+                int remainingBits;
+                while ((IntPtr) SIO != IntPtr.Zero && (remainingBits = SIO->remainingBits) != 0) {
+                    if (remainingBits != prevBits) {
+                        Console.WriteLine($"Waiting - {remainingBits} bits left.");
+                        prevBits = remainingBits;
+                    }
+                    Thread.Sleep(0);
                 }
+
+                if ((IntPtr) SIO == IntPtr.Zero)
+                    return;
+
                 Console.WriteLine($"Sending 0x{data.ToString("X2")}");
                 SIO->pendingSB = data;
                 SIO->remainingBits = 8;
@@ -109,7 +122,7 @@ namespace MidiToMGBA {
 
         private static bool Init(GBSIODriver* driver) {
             Console.WriteLine("mGBALink Driver: Init");
-            return true;
+            return !Debugger.IsAttached;
         }
 
         private static void Deinit(GBSIODriver* driver) {

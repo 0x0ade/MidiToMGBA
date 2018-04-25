@@ -74,21 +74,21 @@ namespace MidiToMGBA {
 #if !DEBUG
             try {
 #endif
-            Console.WriteLine("Setting up mGBA link driver");
-            using (MGBALink link = new MGBALink()) {
-                Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
-                using (InputDevice input = new InputDevice(inputId)) {
-                    using (MidiToMGBABridge bridge = new MidiToMGBABridge(input, link)) {
-                        Console.WriteLine($"Starting up mGBA, loading {rom}");
-                        argsMGBA.Add(rom);
-                        Thread thread = new Thread(() => MGBA.MMain(argsMGBA.ToArray()));
-                        thread.Start();
-                        while (thread.IsAlive) {
-                            Thread.Sleep(0);
+                Console.WriteLine("Setting up mGBA link");
+                using (MGBALink link = new MGBALink()) {
+                    Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
+                    using (InputDevice input = new InputDevice(inputId, false, false)) {
+                        using (MidiToMGBABridge bridge = new MidiToMGBABridge(input, link)) {
+                            Console.WriteLine($"Starting up mGBA, loading {rom}");
+                            argsMGBA.Add(rom);
+                            Thread thread = new Thread(() => MGBA.MMain(argsMGBA.ToArray()));
+                            thread.Start();
+                            while (thread.IsAlive) {
+                                Thread.Sleep(0);
+                            }
                         }
                     }
                 }
-            }
 #if !DEBUG
             } catch (Exception e) {
                 Console.WriteLine("Fatal Error!");

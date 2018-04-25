@@ -18,15 +18,12 @@ namespace MidiToMGBA {
             Input = input;
             Link = link;
 
-            input.PostEventsOnCreationContext = false;
-            input.PostDriverCallbackToDelegateQueue = false;
             input.MessageReceived += HandleMIDI;
 
             input.StartRecording();
         }
 
         private void HandleMIDI(IMidiMessage msg) {
-            Console.WriteLine($"Received {msg.MessageType}");
             lock (Link) {
                 foreach (byte data in msg.GetBytes()) {
                     Link.Send(data);
