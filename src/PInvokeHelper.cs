@@ -109,9 +109,6 @@ namespace MidiToMGBA {
             return NULL;
         }
 
-        public static T GetDelegate<T>(this IntPtr lib) where T : class {
-            return lib.GetDelegate<T>(typeof(T).Name.Substring(2));
-        }
         public static T GetDelegate<T>(this IntPtr lib, string name) where T : class {
             if (lib == NULL)
                 return null;
@@ -142,7 +139,7 @@ namespace MidiToMGBA {
                     return GetCurrentThreadId();
 
                 if (Environment.OSVersion.Platform == PlatformID.Unix || Environment.OSVersion.Platform == PlatformID.MacOSX)
-                    return (pthread_self = pthread_self ?? PThread.GetDelegate<d_pthread_self>())?.Invoke() ?? 0;
+                    return (pthread_self = pthread_self ?? PThread.GetDelegate<d_pthread_self>("pthread_self"))?.Invoke() ?? 0;
 
                 return 0;
             }

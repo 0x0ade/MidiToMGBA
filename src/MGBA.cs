@@ -13,6 +13,7 @@ namespace MidiToMGBA {
 
         [DllImport(libmgbasdl, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mSDLMain")]
         private static extern int INTERNAL_mSDLMain(int argc, byte** argv);
+        private delegate int d_mSDLMain(int argc, byte** argv);
         public static void MMain(params string[] args) {
             IntPtr* argv = (IntPtr*) Marshal.AllocHGlobal(IntPtr.Size * args.Length + 1);
             argv[0] = Marshal.StringToHGlobalAnsi(Assembly.GetEntryAssembly().Location);
