@@ -6,16 +6,17 @@ using System.Text;
 using System.Threading;
 using System.Collections.ObjectModel;
 using Sanford.Multimedia.Midi;
+using System.IO;
 
-namespace MidiToBGB {
+namespace MidiToMGBA {
     class Program {
 
         static void Main(string[] args) {
-            Console.WriteLine($"MidiToBGB {Assembly.GetExecutingAssembly().GetName().Version}");
+            Console.WriteLine($"MidiToMGBA {Assembly.GetExecutingAssembly().GetName().Version}");
 
             if (InputDevice.DeviceCount == 0) {
                 Console.WriteLine("No MIDI input device found.");
-                Console.WriteLine("If you want to control BGB from your DAW, use http://www.tobias-erichsen.de/software/loopmidi.html");
+                Console.WriteLine("If you want to control mGBA from your DAW, use http://www.tobias-erichsen.de/software/loopmidi.html");
                 Console.WriteLine("Press any key to exit.");
                 Console.ReadKey();
                 return;
@@ -23,14 +24,16 @@ namespace MidiToBGB {
 
             MidiInCaps caps;
             int inputId = -1;
-            string bgbHost = "127.0.0.1";
-            int bgbPort = 8765;
 
-            Queue<string> argQueue = new Queue<string>(args);
-            while (argQueue.Count > 0) {
-                string arg = argQueue.Dequeue();
+            string rom = "mGB.gb";
+
+            Queue<string> argsQueue = new Queue<string>(args);
+            List<string> argsMGBA = new List<string>(args.Length);
+            while (argsQueue.Count > 0) {
+                string arg = argsQueue.Dequeue();
+
                 if (arg == "--midi") {
-                    string inputName = argQueue.Dequeue().ToLowerInvariant();
+                    string inputName = argsQueue.Dequeue().ToLowerInvariant();
                     if (!int.TryParse(inputName, out inputId)) {
                         inputId = -1;
                     }
@@ -49,9 +52,11 @@ namespace MidiToBGB {
                         Console.ReadKey();
                     }
 
-                } else if (arg == "--bgb") {
-                    bgbHost = argQueue.Dequeue();
-                    bgbPort = int.Parse(argQueue.Dequeue());
+                } else if (arg == "--rom") {
+                    rom = argsQueue.Dequeue();
+
+                } else {
+                    argsMGBA.Add(arg);
                 }
             }
 
@@ -65,25 +70,30 @@ namespace MidiToBGB {
             }
 
             caps = InputDevice.GetDeviceCapabilities(inputId);
-            while (true) {
-                try {
-                    Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
-                    using (InputDevice input = new InputDevice(inputId)) {
-                        Console.WriteLine($"Connecting to BGB {bgbHost} {bgbPort}");
-                        using (BGBLink link = new BGBLink(bgbHost, bgbPort)) {
-                            Console.WriteLine("Starting bridge.");
-                            using (MidiToBGBBridge bridge = new MidiToBGBBridge(input, link)) {
-                                while (link.Client.Client.Connected && !input.IsDisposed)
-                                    Thread.Sleep(0);
-                            }
-                        }
+
+#if !DEBUG
+            try {
+#endif
+            Console.WriteLine("Setting up mGBA link driver");
+            using (MGBALink link = new MGBALink()) {
+                Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
+                using (InputDevice input = new InputDevice(inputId)) {
+                    using (MidiToMGBABridge bridge = new MidiToMGBABridge(input, link)) {
+                        Console.WriteLine($"Starting up mGBA, loading {rom}");
+                        argsMGBA.Add(rom);
+                        MGBA.mSDLMain(argsMGBA.ToArray());
                     }
-                } catch (Exception e) {
-                    Console.WriteLine("Error!");
-                    Console.WriteLine(e);
-                    Console.WriteLine("Retrying...");
                 }
             }
+#if !DEBUG
+            } catch (Exception e) {
+                Console.WriteLine("Fatal Error!");
+                Console.WriteLine(e);
+                if (File.Exists("error.txt"))
+                    File.Delete("error.txt");
+                File.WriteAllText("error.txt", $"MidiToMGBA {Assembly.GetExecutingAssembly().GetName().Version}\r\n\r\n{e.ToString().Replace("\n", "\r\n").Replace("\r\r\n", "\r\n")}");
+            }
+#endif
         }
 
     }

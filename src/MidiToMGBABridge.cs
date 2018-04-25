@@ -8,40 +8,34 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
-namespace MidiToBGB {
-    public class MidiToBGBBridge : IDisposable {
+namespace MidiToMGBA {
+    public class MidiToMGBABridge : IDisposable {
         
         public InputDevice Input;
-        public BGBLink BGB;
+        public MGBALink Link;
 
-        public MidiToBGBBridge(InputDevice input, BGBLink bgb) {
+        public MidiToMGBABridge(InputDevice input, MGBALink link) {
             Input = input;
-            BGB = bgb;
+            Link = link;
 
             input.MessageReceived += HandleMIDI;
-            bgb.OnReceive += HandleBGB;
 
             Input?.StartRecording();
         }
 
         private void HandleMIDI(IMidiMessage msg) {
-            lock (BGB) {
+            lock (Link) {
                 foreach (byte data in msg.GetBytes()) {
-                    BGB.Send(data);
+                    Link.Send(data);
                 }
             }
-        }
-
-        private void HandleBGB(byte data) {
         }
 
         public void Dispose() {
             Input?.StopRecording();
             Input?.Dispose();
-            BGB?.Dispose();
+            Link?.Dispose();
         }
-        
-        
 
     }
 }

@@ -7,9 +7,9 @@
     <ProjectGuid>{5B36E77F-B147-418D-A5D8-C2EF7475BE7F}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MidiToBGB</RootNamespace>
-    <AssemblyName>MidiToBGB</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <RootNamespace>MidiToMGBA</RootNamespace>
+    <AssemblyName>MidiToMGBA</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -24,6 +24,7 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -45,19 +46,39 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BGBCommand.cs" />
-    <Compile Include="MidiToBGBBridge.cs" />
-    <Compile Include="BGBLink.cs" />
-    <Compile Include="BGBLinkClient.cs" />
-    <Compile Include="BGBPacket.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="src\MGBALink.cs" />
+    <Compile Include="src\MGBA.cs" />
+    <Compile Include="src\MidiToMGBABridge.cs" />
+    <Compile Include="src\PInvokeHelper.cs" />
+    <Compile Include="src\Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="MidiToBGB.bat">
+    <None Include="etc\mGB.gb">
+      <Link>mGB.gb</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="etc\MidiToMGBA.bat">
+      <Link>MidiToMGBA.bat</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="mGBA\*">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="MonoMod\MonoMod.RuntimeDetour\MonoMod.RuntimeDetour.csproj">
+      <Project>{d0c584c0-81d7-486e-b70e-d7f9256e0909}</Project>
+      <Name>MonoMod.RuntimeDetour</Name>
+    </ProjectReference>
+    <ProjectReference Include="MonoMod\MonoMod.Utils\MonoMod.Utils.csproj">
+      <Project>{1839cfe2-3db0-45a8-b03d-9aa797479a3a}</Project>
+      <Name>MonoMod.Utils</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
