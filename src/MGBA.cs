@@ -13,8 +13,7 @@ namespace MidiToMGBA {
 
         [DllImport(libmgbasdl, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mSDLMain")]
         private static extern int INTERNAL_mSDLMain(int argc, byte** argv);
-
-        public static void mSDLMain(params string[] args) {
+        public static void MMain(params string[] args) {
             IntPtr* argv = (IntPtr*) Marshal.AllocHGlobal(IntPtr.Size * args.Length + 1);
             argv[0] = Marshal.StringToHGlobalAnsi(Assembly.GetEntryAssembly().Location);
             for (int i = 0; i < args.Length; i++)
@@ -173,9 +172,9 @@ namespace MidiToMGBA {
             // #endif
         }
 
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "LockstepInit")]
-        private static extern void INTERNAL_LockstepInit(IntPtr lockstep);
-        public static void LockstepInit(Lockstep* lockstep) => INTERNAL_LockstepInit((IntPtr) lockstep);
+        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mLockstepInit")]
+        private static extern void INTERNAL_mLockstepInit(IntPtr lockstep);
+        public static void LockstepInit(Lockstep* lockstep) => INTERNAL_mLockstepInit((IntPtr) lockstep);
 
         #endregion
 

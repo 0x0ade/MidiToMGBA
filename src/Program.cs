@@ -81,7 +81,7 @@ namespace MidiToMGBA {
                     using (MidiToMGBABridge bridge = new MidiToMGBABridge(input, link)) {
                         Console.WriteLine($"Starting up mGBA, loading {rom}");
                         argsMGBA.Add(rom);
-                        MGBA.mSDLMain(argsMGBA.ToArray());
+                        MGBA.MMain(argsMGBA.ToArray());
                     }
                 }
             }
