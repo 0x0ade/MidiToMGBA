@@ -6,6 +6,8 @@
 :: --rom is optional and defaults to mGB.gb
 :: --mgba is optional and defaults to libmgba.dll
 :: --mgba-sdl is optional and defaults to libmgba-sdl.dll
+:: --log-data is optional, disabled by default, and triggers the verbose data log.
+:: --sync is optional and defaults to 32 - lower values introduce "misses", higher values increase latency.
 
 :: Example - connect "Some Cool Device" to pushpin:
 :: MidiToMGBA.exe --midi SomeCoolDevice --rom pushpin.gbc

@@ -23,6 +23,8 @@ namespace MidiToMGBA {
         public static Queue<byte> Queue = new Queue<byte>();
 
         public static bool LogData = false;
+        public readonly static int DequeueSyncDefault = 32;
+        public static int DequeueSync = DequeueSyncDefault;
 
         public MGBALink() {
             if (Links.Count == 0) {
@@ -115,7 +117,7 @@ namespace MidiToMGBA {
             }
 
             // Reschedule the Dequeue event.
-            mTimingSchedule(Timing, DequeueEvent, Math.Max(1, SIO->period * 32));
+            mTimingSchedule(Timing, DequeueEvent, Math.Max(1, SIO->period * DequeueSync));
         }
 
         public void Dispose() {
