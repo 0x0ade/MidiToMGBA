@@ -55,6 +55,12 @@ namespace MidiToMGBA {
                 } else if (arg == "--rom") {
                     rom = argsQueue.Dequeue();
 
+                } else if (arg == "--mgba") {
+                    DynamicDll.DllMap["libmgba.dll"] = argsQueue.Dequeue();
+
+                } else if (arg == "--mgba-sdl") {
+                    DynamicDll.DllMap["libmgba-sdl.dll"] = argsQueue.Dequeue();
+
                 } else {
                     argsMGBA.Add(arg);
                 }

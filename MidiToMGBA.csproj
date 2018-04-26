@@ -50,7 +50,7 @@
     <Compile Include="src\MGBALink.cs" />
     <Compile Include="src\MGBA.cs" />
     <Compile Include="src\MidiToMGBABridge.cs" />
-    <Compile Include="src\PInvokeHelper.cs" />
+    <Compile Include="src\DynamicDll.cs" />
     <Compile Include="src\Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

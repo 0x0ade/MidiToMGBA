@@ -1,11 +1,14 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
 using System;
+using System.Collections.Generic;
 
 namespace MidiToMGBA {
-    public static class PInvokeHelper {
+    public static class DynamicDll {
 
         private readonly static IntPtr NULL = IntPtr.Zero;
+
+        public static Dictionary<string, string> DllMap = new Dictionary<string, string>();
 
         // Windows
         [DllImport("kernel32")]
@@ -65,6 +68,10 @@ namespace MidiToMGBA {
         }
 
         public static IntPtr OpenLibrary(string name) {
+            string mapped;
+            if (DllMap.TryGetValue(name, out mapped))
+                name = mapped;
+
             if (Environment.OSVersion.Platform == PlatformID.Win32NT) {
                 IntPtr lib = GetModuleHandle(name);
                 if (lib == NULL) {
@@ -145,5 +152,41 @@ namespace MidiToMGBA {
             }
         }
 
+        public static void ResolveDynamicDllImports(this Type type) {
+            foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)) {
+                bool found = true;
+                foreach (DynamicDllImportAttribute attrib in field.GetCustomAttributes(typeof(DynamicDllImportAttribute), true)) {
+                    found = false;
+                    IntPtr asm = OpenLibrary(attrib.DLL);
+                    if (asm == NULL)
+                        continue;
+
+                    foreach (string ep in attrib.EntryPoints) {
+                        IntPtr func = asm.GetFunction(ep);
+                        if (func == NULL)
+                            continue;
+                        field.SetValue(null, Marshal.GetDelegateForFunctionPointer(func, field.FieldType));
+                        found = true;
+                        break;
+                    }
+
+                    if (found)
+                        break;
+                }
+                if (!found)
+                    throw new EntryPointNotFoundException($"No matching entry point found for {field.Name} in {field.DeclaringType.FullName}");
+            }
+        }
+
+    }
+
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
+    public class DynamicDllImportAttribute : Attribute {
+        public string DLL;
+        public string[] EntryPoints;
+        public DynamicDllImportAttribute(string dll, params string[] entryPoints) {
+            DLL = dll;
+            EntryPoints = entryPoints;
+        }
     }
 }

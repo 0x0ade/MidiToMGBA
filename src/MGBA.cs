@@ -11,9 +11,13 @@ namespace MidiToMGBA {
         const string libmgba = "libmgba.dll";
         const string libmgbasdl = "libmgba-sdl.dll";
 
-        [DllImport(libmgbasdl, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mSDLMain")]
-        private static extern int INTERNAL_mSDLMain(int argc, byte** argv);
-        private delegate int d_mSDLMain(int argc, byte** argv);
+        static MGBA() {
+            typeof(MGBA).ResolveDynamicDllImports();
+        }
+
+        private delegate int d_mMain(int argc, byte** argv);
+        [DynamicDllImport(libmgbasdl, "mSDLMain", "mMain", "main")]
+        private readonly static d_mMain INTERNAL_mMain;
         public static void mMain(params string[] args) {
             IntPtr* argv = (IntPtr*) Marshal.AllocHGlobal(IntPtr.Size * args.Length + 1);
             argv[0] = Marshal.StringToHGlobalAnsi(Assembly.GetEntryAssembly().Location);
@@ -22,7 +26,7 @@ namespace MidiToMGBA {
 
             int code;
             try {
-                code = INTERNAL_mSDLMain(args.Length + 1, (byte**) argv);
+                code = INTERNAL_mMain(args.Length + 1, (byte**) argv);
             } finally {
                 for (int i = 0; i < args.Length + 1; i++)
                     Marshal.FreeHGlobal(argv[i]);
@@ -70,14 +74,17 @@ namespace MidiToMGBA {
             public int* nextEvent;
         }
 
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingSchedule")]
-        private extern static void INTERNAL_mTimingSchedule(IntPtr timing, IntPtr @event, int when);
+        private delegate void d_mTimingSchedule(IntPtr timing, IntPtr @event, int when);
+        [DynamicDllImport(libmgba, "mTimingSchedule")]
+        private readonly static d_mTimingSchedule INTERNAL_mTimingSchedule;
         public static void mTimingSchedule(mTiming* timing, mTimingEvent* @event, int when) => INTERNAL_mTimingSchedule((IntPtr) timing, (IntPtr) @event, when);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingDeschedule")]
-        private extern static void INTERNAL_mTimingDeschedule(IntPtr timing, IntPtr @event);
+        private delegate void d_mTimingDeschedule(IntPtr timing, IntPtr @event);
+        [DynamicDllImport(libmgba, "mTimingDeschedule")]
+        private readonly static d_mTimingDeschedule INTERNAL_mTimingDeschedule;
         public static void mTimingDeschedule(mTiming* timing, mTimingEvent* @event) => INTERNAL_mTimingDeschedule((IntPtr) timing, (IntPtr) @event);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingIsScheduled")]
-        private extern static bool INTERNAL_mTimingIsScheduled(IntPtr timing, IntPtr @event);
+        private delegate bool d_mTimingIsScheduled(IntPtr timing, IntPtr @event);
+        [DynamicDllImport(libmgba, "mTimingIsScheduled")]
+        private readonly static d_mTimingIsScheduled INTERNAL_mTimingIsScheduled;
         public static bool mTimingIsScheduled(mTiming* timing, mTimingEvent* @event) => INTERNAL_mTimingIsScheduled((IntPtr) timing, (IntPtr) @event);
 
         #endregion
@@ -304,23 +311,29 @@ namespace MidiToMGBA {
 
         public const int MAX_GBS = 2;
 
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOInit")]
-        private static extern void INTERNAL_GBSIOInit(IntPtr sio);
+        private delegate void d_GBSIOInit(IntPtr sio);
+        [DynamicDllImport(libmgba, "GBSIOInit")]
+        private readonly static d_GBSIOInit INTERNAL_GBSIOInit;
         public static void GBSIOInit(GBSIO* sio) => INTERNAL_GBSIOInit((IntPtr) sio);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOReset")]
-        private static extern void INTERNAL_GBSIOReset(IntPtr sio);
+        private delegate void d_GBSIOReset(IntPtr sio);
+        [DynamicDllImport(libmgba, "GBSIOReset")]
+        private readonly static d_GBSIOReset INTERNAL_GBSIOReset;
         public static void GBSIOReset(GBSIO* sio) => INTERNAL_GBSIOReset((IntPtr) sio);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIODeinit")]
-        private static extern void INTERNAL_GBSIODeinit(IntPtr sio);
+        private delegate void d_GBSIODeinit(IntPtr sio);
+        [DynamicDllImport(libmgba, "GBSIODeinit")]
+        private readonly static d_GBSIODeinit INTERNAL_GBSIODeinit;
         public static void GBSIODeinit(GBSIO* sio) => INTERNAL_GBSIODeinit((IntPtr) sio);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOSetDriver")]
-        private static extern void INTERNAL_GBSIOSetDriver(IntPtr sio, IntPtr driver);
+        private delegate void d_GBSIOSetDriver(IntPtr sio, IntPtr driver);
+        [DynamicDllImport(libmgba, "GBSIOSetDriver")]
+        private readonly static d_GBSIOSetDriver INTERNAL_GBSIOSetDriver;
         public static void GBSIOSetDriver(GBSIO* sio, GBSIODriver* driver) => INTERNAL_GBSIOSetDriver((IntPtr) sio, (IntPtr) driver);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOWriteSC")]
-        private static extern void INTERNAL_GBSIOWriteSC(IntPtr sio, byte sc);
+        private delegate void d_GBSIOWriteSC(IntPtr sio, byte sc);
+        [DynamicDllImport(libmgba, "GBSIOWriteSC")]
+        private readonly static d_GBSIOWriteSC INTERNAL_GBSIOWriteSC;
         public static void GBSIOWriteSC(GBSIO* sio, byte sc) => INTERNAL_GBSIOWriteSC((IntPtr) sio, sc);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOWriteSB")]
-        private static extern void INTERNAL_GBSIOWriteSB(IntPtr sio, byte sb);
+        private delegate void d_GBSIOWriteSB(IntPtr sio, byte sb);
+        [DynamicDllImport(libmgba, "GBSIOWriteSB")]
+        private readonly static d_GBSIOWriteSB INTERNAL_GBSIOWriteSB;
         public static void GBSIOWriteSB(GBSIO* sio, byte sb) => INTERNAL_GBSIOWriteSB((IntPtr) sio, sb);
         
         public struct GBSIODriver {
@@ -444,8 +457,9 @@ namespace MidiToMGBA {
             // #endif
         }
 
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mLockstepInit")]
-        private static extern void INTERNAL_mLockstepInit(IntPtr lockstep);
+        private delegate void d_mLockstepInit(IntPtr lockstep);
+        [DynamicDllImport(libmgba, "mLockstepInit")]
+        private readonly static d_mLockstepInit INTERNAL_mLockstepInit;
         public static void mLockstepInit(mLockstep* lockstep) => INTERNAL_mLockstepInit((IntPtr) lockstep);
 
         #endregion
@@ -478,17 +492,21 @@ namespace MidiToMGBA {
             // #endif
         }
 
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOLockstepInit")]
-        private static extern void INTERNAL_GBSIOLockstepInit(IntPtr lockstep);
+        private delegate void d_GBSIOLockstepInit(IntPtr lockstep);
+        [DynamicDllImport(libmgba, "GBSIOLockstepInit")]
+        private readonly static d_GBSIOLockstepInit INTERNAL_GBSIOLockstepInit;
         public static void GBSIOLockstepInit(GBSIOLockstep* lockstep) => INTERNAL_GBSIOLockstepInit((IntPtr) lockstep);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOLockstepNodeCreate")]
-        private static extern void INTERNAL_GBSIOLockstepNodeCreate(IntPtr node);
+        private delegate void d_GBSIOLockstepNodeCreate(IntPtr node);
+        [DynamicDllImport(libmgba, "GBSIOLockstepNodeCreate")]
+        private readonly static d_GBSIOLockstepNodeCreate INTERNAL_GBSIOLockstepNodeCreate;
         public static void GBSIOLockstepNodeCreate(GBSIOLockstepNode* node) => INTERNAL_GBSIOLockstepNodeCreate((IntPtr) node);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOLockstepAttachNode")]
-        private static extern bool INTERNAL_GBSIOLockstepAttachNode(IntPtr lockstep, IntPtr node);
+        private delegate bool d_GBSIOLockstepAttachNode(IntPtr lockstep, IntPtr node);
+        [DynamicDllImport(libmgba, "GBSIOLockstepAttachNode")]
+        private readonly static d_GBSIOLockstepAttachNode INTERNAL_GBSIOLockstepAttachNode;
         public static bool GBSIOLockstepAttachNode(GBSIOLockstep* lockstep, GBSIOLockstepNode* node) => INTERNAL_GBSIOLockstepAttachNode((IntPtr) lockstep, (IntPtr) node);
-        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GBSIOLockstepDetachNode")]
-        private static extern void INTERNAL_GBSIOLockstepDetachNode(IntPtr lockstep, IntPtr node);
+        private delegate void d_GBSIOLockstepDetachNode(IntPtr lockstep, IntPtr node);
+        [DynamicDllImport(libmgba, "GBSIOLockstepDetachNode")]
+        private readonly static d_GBSIOLockstepDetachNode INTERNAL_GBSIOLockstepDetachNode;
         public static void GBSIOLockstepDetachNode(GBSIOLockstep* lockstep, GBSIOLockstepNode* node) => INTERNAL_GBSIOLockstepDetachNode((IntPtr) lockstep, (IntPtr) node);
 
         #endregion

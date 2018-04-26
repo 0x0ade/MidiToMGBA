@@ -28,8 +28,8 @@ namespace MidiToMGBA {
             if (Links.Count == 0) {
                 // First link - setup.
 
-                IntPtr libmgba = PInvokeHelper.OpenLibrary("libmgba.dll");
-                IntPtr libmgbasdl = PInvokeHelper.OpenLibrary("libmgba-sdl.dll");
+                IntPtr libmgba = DynamicDll.OpenLibrary("libmgba.dll");
+                IntPtr libmgbasdl = DynamicDll.OpenLibrary("libmgba-sdl.dll");
 
                 // Hook GBSIOInit to grab a reference to GBSIO.
                 h_GBSIOInit = new NativeDetour(
@@ -76,7 +76,7 @@ namespace MidiToMGBA {
                 DequeueEvent->name = (byte*) Marshal.StringToHGlobalAnsi("MidiToGBG Data Dequeue");
                 DequeueEvent->callback = inst_Dequeue = Dequeue;
                 handle_Dequeue = GCHandle.Alloc(inst_Dequeue);
-                DequeueEvent->priority = 0x00;
+                DequeueEvent->priority = 0x0ade;
             }
 
             Links.Add(this);
