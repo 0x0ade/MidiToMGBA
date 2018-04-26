@@ -20,6 +20,8 @@ namespace MidiToMGBA {
         public static mTiming* Timing;
         public static GBSIO* SIO;
 
+        public static mTimingEvent* DequeueEvent;
+
         public static Queue<byte> Queue = new Queue<byte>();
 
         public MGBALink() {
@@ -43,19 +45,19 @@ namespace MidiToMGBA {
                 );
                 orig_GBSIODeinit = h_GBSIODeinit.GenerateTrampoline<d_GBSIODeinit>();
 
-                // Hook mTimingInit (called via non-exported GBInit) to grab a reference to mTiming.
+                // Hook mTimingInit (called via non-exported GBInit) to set up any timing-related stuff.
                 h_mTimingInit = new NativeDetour(
                     libmgba.GetFunction("mTimingInit"),
                     typeof(MGBALink).GetMethod("mTimingInit", BindingFlags.NonPublic | BindingFlags.Static)
                 );
                 orig_mTimingInit = h_mTimingInit.GenerateTrampoline<d_mTimingInit>();
 
-                // Hook mCoreThreadStart to inject the link feeder.
-                h_mCoreThreadStart = new NativeDetour(
-                    libmgba.GetFunction("mCoreThreadStart"),
-                    typeof(MGBALink).GetMethod("mCoreThreadStart", BindingFlags.NonPublic | BindingFlags.Static)
+                // Hook _GBSIOProcessEvents to... do nothing, for now.
+                h__GBSIOProcessEvents = new NativeDetour(
+                    libmgba.GetFunction("_GBSIOProcessEvents"),
+                    typeof(MGBALink).GetMethod("_GBSIOProcessEvents", BindingFlags.NonPublic | BindingFlags.Static)
                 );
-                orig_mCoreThreadStart = h_mCoreThreadStart.GenerateTrampoline<d_mCoreThreadStart>();
+                orig__GBSIOProcessEvents = h__GBSIOProcessEvents.GenerateTrampoline<d__GBSIOProcessEvents>();
 
                 // Hook mSDLAttachPlayer to hook the renderer's runloop.
                 // This is required to fix any managed runtime <-> unmanaged state bugs.
@@ -64,19 +66,41 @@ namespace MidiToMGBA {
                     typeof(MGBALink).GetMethod("mSDLAttachPlayer", BindingFlags.NonPublic | BindingFlags.Static)
                 );
                 orig_mSDLAttachPlayer = h_mSDLAttachPlayer.GenerateTrampoline<d_mSDLAttachPlayer>();
+
+                // Setup the dequeueing event.
+                DequeueEvent = (mTimingEvent*) Marshal.AllocHGlobal(sizeof(mTimingEvent));
+                // Slow but functional zeroing.
+                for (int i = 0; i < sizeof(mTimingEvent); i++)
+                    *((byte*) ((IntPtr) DequeueEvent + i)) = 0x00;
+                DequeueEvent->context = (void*) IntPtr.Zero;
+                DequeueEvent->name = (byte*) Marshal.StringToHGlobalAnsi("MidiToGBG Data Dequeue");
+                DequeueEvent->callback = inst_Dequeue = Dequeue;
+                handle_Dequeue = GCHandle.Alloc(inst_Dequeue);
+                DequeueEvent->priority = 0x30;
             }
 
             Links.Add(this);
         }
 
         public void Send(byte data) {
-            lock (SIOLock) {
-                if ((IntPtr) SIO == IntPtr.Zero)
-                    return;
+            Console.WriteLine($"+ 0x{data.ToString("X2")} #{Queue.Count}");
+            Queue.Enqueue(data);
+        }
 
-                Console.WriteLine($"Queuing 0x{data.ToString("X2")}");
-                Queue.Enqueue(data);
+        private static mTimingEvent.d_callback inst_Dequeue;
+        private static GCHandle handle_Dequeue;
+        private static void Dequeue(mTiming* timing, void* context, uint cyclesLate) {
+            if (Queue.Count > 0) {
+                byte data = Queue.Dequeue();
+                SIO->pendingSB = data;
+                Console.WriteLine($"- 0x{data.ToString("X2")}, {Queue.Count} left");
+                // Telling mGBA to write to SC makes it read the pending SB.
+                GBSIOWriteSC(SIO, 0x81);
+                // Force period to 16 on subsequent bit shifts for fast transfer.
+                SIO->period = 16;
             }
+
+            mTimingSchedule(Timing, DequeueEvent, 1024);
         }
 
         public void Dispose() {
@@ -100,9 +124,9 @@ namespace MidiToMGBA {
             h_mTimingInit.Free();
             h_mTimingInit = null;
 
-            h_mCoreThreadStart.Undo();
-            h_mCoreThreadStart.Free();
-            h_mCoreThreadStart = null;
+            h__GBSIOProcessEvents.Undo();
+            h__GBSIOProcessEvents.Free();
+            h__GBSIOProcessEvents = null;
 
             h_mSDLAttachPlayer.Undo();
             h_mSDLAttachPlayer.Free();
@@ -110,7 +134,29 @@ namespace MidiToMGBA {
 
             Timing = (mTiming*) IntPtr.Zero;
             SIO = (GBSIO*) IntPtr.Zero;
+
+            Marshal.FreeHGlobal((IntPtr) DequeueEvent->name);
+            Marshal.FreeHGlobal((IntPtr) DequeueEvent);
+            DequeueEvent = (mTimingEvent*) IntPtr.Zero;
         }
+
+        #region Delegate Hooks
+
+        private delegate void d_mSDLRunLoop(IntPtr rendererPtr, IntPtr userPtr);
+        private static d_mSDLRunLoop orig_mSDLRunLoop;
+        private static d_mSDLRunLoop inst_mSDLRunLoop;
+        private static GCHandle handle_mSDLRunLoop;
+        private static void mSDLRunLoop(IntPtr rendererPtr, IntPtr userPtr) {
+            Console.WriteLine($"mSDLRunLoop, renderer @ 0x{rendererPtr.ToString("X16")}, user @ 0x{userPtr.ToString("X16")}");
+
+            mTimingSchedule(Timing, DequeueEvent, 0);
+
+            orig_mSDLRunLoop(rendererPtr, userPtr);
+        }
+
+        #endregion
+
+        #region NativeDetours
 
         private static NativeDetour h_GBSIOInit;
         private delegate void d_GBSIOInit(IntPtr sioPtr);
@@ -145,33 +191,15 @@ namespace MidiToMGBA {
             orig_mTimingInit(timingPtr, relativeCyclesPtr, nextEventPtr);
 
             Timing = (mTiming*) timingPtr;
+
         }
 
-        private static NativeDetour h_mCoreThreadStart;
-        private delegate bool d_mCoreThreadStart(IntPtr threadContextPtr);
-        private static d_mCoreThreadStart orig_mCoreThreadStart;
-        private static bool mCoreThreadStart(IntPtr threadContextPtr) {
-            Console.WriteLine($"mCoreThreadStart, threadContext @ 0x{threadContextPtr.ToString("X16")}");
-            bool rv = orig_mCoreThreadStart(threadContextPtr);
-
-            mCoreThread* threadContext = (mCoreThread*) threadContextPtr;
-            orig_frameCallback = threadContext->frameCallback;
-            threadContext->frameCallback = frameCallback;
-
-            return rv;
-        }
-
-        private static ThreadCallback orig_frameCallback;
-        private static void frameCallback(mCoreThread* threadContext) {
-            // Console.WriteLine($"frameCallback, threadContext @ 0x{((IntPtr) threadContext).ToString("X16")}");
-            orig_frameCallback?.Invoke(threadContext);
-
-            if (Queue.Count > 0) {
-                byte data = Queue.Dequeue();
-                SIO->pendingSB = data;
-                // Telling mGBA to write to SC makes it read the pending SB.
-                GBSIOWriteSC(SIO, 0x83);
-            }
+        private static NativeDetour h__GBSIOProcessEvents;
+        private delegate void d__GBSIOProcessEvents(IntPtr timingPtr, IntPtr contextPtr, uint cyclesLate);
+        private static d__GBSIOProcessEvents orig__GBSIOProcessEvents;
+        private static void _GBSIOProcessEvents(IntPtr timingPtr, IntPtr contextPtr, uint cyclesLate) {
+            // Console.WriteLine($"_GBSIOProcessEvents, timing @ 0x{timingPtr.ToString("X16")}, context @ 0x{contextPtr.ToString("X16")}, cyclesLate: {cyclesLate}");
+            orig__GBSIOProcessEvents(timingPtr, contextPtr, cyclesLate);
         }
 
         private static NativeDetour h_mSDLAttachPlayer;
@@ -183,7 +211,7 @@ namespace MidiToMGBA {
 
             // mSDLPlayer is part of the mSDLRenderer struct. The init and runloop function pointers are after the player.
             mSDLPlayer* player = (mSDLPlayer*) playerPtr;
-            IntPtr init = playerPtr + Marshal.SizeOf(typeof(mSDLPlayer));
+            IntPtr init = playerPtr + sizeof(mSDLPlayer);
             IntPtr runloop = init + IntPtr.Size;
             // Set our own RunLoop using GetFunctionPointerForDelegate and GetDelegateForFunctionPointer,
             // so that the .NET runtime can deal with the context switch properly.
@@ -191,18 +219,13 @@ namespace MidiToMGBA {
             if (orig_mSDLRunLoop == null) {
                 orig_mSDLRunLoop = (d_mSDLRunLoop) Marshal.GetDelegateForFunctionPointer(*((IntPtr*) runloop), typeof(d_mSDLRunLoop));
                 *((IntPtr*) runloop) = Marshal.GetFunctionPointerForDelegate(inst_mSDLRunLoop = mSDLRunLoop);
+                handle_mSDLRunLoop = GCHandle.Alloc(inst_mSDLRunLoop);
             }
 
             return rv;
         }
 
-        private delegate void d_mSDLRunLoop(IntPtr rendererPtr, IntPtr userPtr);
-        private static d_mSDLRunLoop orig_mSDLRunLoop;
-        private static d_mSDLRunLoop inst_mSDLRunLoop;
-        private static void mSDLRunLoop(IntPtr rendererPtr, IntPtr userPtr) {
-            Console.WriteLine($"mSDLRunLoop, renderer @ 0x{rendererPtr.ToString("X16")}, user @ 0x{userPtr.ToString("X16")}");
-            orig_mSDLRunLoop(rendererPtr, userPtr);
-        }
+    #endregion
 
     }
 }

@@ -38,7 +38,7 @@ namespace MidiToMGBA {
         public struct mTimingEvent {
             public void* context;
             // void (*callback)(struct mTiming*, void* context, uint32_t);
-            public delegate void d_callback(mTiming* timing, void* context, uint when);
+            public delegate void d_callback(mTiming* timing, void* context, uint cyclesLate);
             public IntPtr _callback;
             public d_callback callback {
                 get {
@@ -54,7 +54,7 @@ namespace MidiToMGBA {
                     _callback = Marshal.GetFunctionPointerForDelegate(value);
                 }
             }
-            public char* name;
+            public byte* name;
             public uint when;
             public uint priority;
 
