@@ -76,7 +76,7 @@ namespace MidiToMGBA {
                 DequeueEvent->name = (byte*) Marshal.StringToHGlobalAnsi("MidiToGBG Data Dequeue");
                 DequeueEvent->callback = inst_Dequeue = Dequeue;
                 handle_Dequeue = GCHandle.Alloc(inst_Dequeue);
-                DequeueEvent->priority = 0x0ade;
+                DequeueEvent->priority = 0x00;
             }
 
             Links.Add(this);
@@ -91,21 +91,30 @@ namespace MidiToMGBA {
         private static mTimingEvent.d_callback inst_Dequeue;
         private static GCHandle handle_Dequeue;
         private static void Dequeue(mTiming* timing, void* context, uint cyclesLate) {
-            if (!mTimingIsScheduled(Timing, &SIO->@event) && SIO->remainingBits != 0) {
+            if (SIO->remainingBits != 0 && !mTimingIsScheduled(Timing, &SIO->@event)) {
+                // Link unstable - scheduled _GBSIOProcessEvents got lost.
                 Console.WriteLine($"XXXXX 0x{SIO->pendingSB.ToString("X2")}, {SIO->remainingBits} bits remaining");
-                mTimingSchedule(Timing, &SIO->@event, SIO->period);
-                mTimingSchedule(Timing, DequeueEvent, SIO->period);
-                return;
+                /*
+                while (SIO->remainingBits > 0) {
+                    _GBSIOProcessEvents((IntPtr) Timing, (IntPtr) SIO, 0);
+                    if (mTimingIsScheduled(Timing, &SIO->@event))
+                        mTimingDeschedule(Timing, &SIO->@event);
+                }
+                */
+                mTimingSchedule(Timing, &SIO->@event, 0);
+
+            } else {
+                // Link stable.
+                if (SIO->remainingBits == 0 && Queue.Count > 0) {
+                    byte data = Queue.Dequeue();
+                    if (LogData)
+                        Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
+                    SIO->pendingSB = data;
+                    GBSIOWriteSC(SIO, 0x83); // ShiftClock, ClockSpeed, -, -, -, -, -, Enable
+                }
             }
 
-            if (Queue.Count > 0 && SIO->remainingBits == 0) {
-                byte data = Queue.Dequeue();
-                if (LogData)
-                    Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
-                SIO->pendingSB = data;
-                GBSIOWriteSC(SIO, 0x83); // ShiftClock, ClockSpeed, -, -, -, -, -, Enable
-            }
-
+            // Reschedule the Dequeue event.
             mTimingSchedule(Timing, DequeueEvent, Math.Max(1, SIO->period * 32));
         }
 
