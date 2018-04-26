@@ -73,6 +73,12 @@ namespace MidiToMGBA {
         [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingSchedule")]
         private extern static void INTERNAL_mTimingSchedule(IntPtr timing, IntPtr @event, int when);
         public static void mTimingSchedule(mTiming* timing, mTimingEvent* @event, int when) => INTERNAL_mTimingSchedule((IntPtr) timing, (IntPtr) @event, when);
+        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingDeschedule")]
+        private extern static void INTERNAL_mTimingDeschedule(IntPtr timing, IntPtr @event);
+        public static void mTimingDeschedule(mTiming* timing, mTimingEvent* @event) => INTERNAL_mTimingDeschedule((IntPtr) timing, (IntPtr) @event);
+        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingIsScheduled")]
+        private extern static bool INTERNAL_mTimingIsScheduled(IntPtr timing, IntPtr @event);
+        public static bool mTimingIsScheduled(mTiming* timing, mTimingEvent* @event) => INTERNAL_mTimingIsScheduled((IntPtr) timing, (IntPtr) @event);
 
         #endregion
 

@@ -13,8 +13,6 @@ using System.Diagnostics;
 namespace MidiToMGBA {
     public unsafe class MGBALink : IDisposable {
 
-        private static object SIOLock = new object();
-
         public static HashSet<MGBALink> Links = new HashSet<MGBALink>();
 
         public static mTiming* Timing;
@@ -23,6 +21,8 @@ namespace MidiToMGBA {
         public static mTimingEvent* DequeueEvent;
 
         public static Queue<byte> Queue = new Queue<byte>();
+
+        public static bool LogData = false;
 
         public MGBALink() {
             if (Links.Count == 0) {
@@ -76,31 +76,37 @@ namespace MidiToMGBA {
                 DequeueEvent->name = (byte*) Marshal.StringToHGlobalAnsi("MidiToGBG Data Dequeue");
                 DequeueEvent->callback = inst_Dequeue = Dequeue;
                 handle_Dequeue = GCHandle.Alloc(inst_Dequeue);
-                DequeueEvent->priority = 0x30;
+                DequeueEvent->priority = 0x0ade;
             }
 
             Links.Add(this);
         }
 
         public void Send(byte data) {
-            Console.WriteLine($"+ 0x{data.ToString("X2")} #{Queue.Count}");
+            if (LogData)
+                Console.WriteLine($"->O   0x{data.ToString("X2")} #{Queue.Count}");
             Queue.Enqueue(data);
         }
 
         private static mTimingEvent.d_callback inst_Dequeue;
         private static GCHandle handle_Dequeue;
         private static void Dequeue(mTiming* timing, void* context, uint cyclesLate) {
-            if (Queue.Count > 0) {
-                byte data = Queue.Dequeue();
-                SIO->pendingSB = data;
-                Console.WriteLine($"- 0x{data.ToString("X2")}, {Queue.Count} left");
-                // Telling mGBA to write to SC makes it read the pending SB.
-                GBSIOWriteSC(SIO, 0x81);
-                // Force period to 16 on subsequent bit shifts for fast transfer.
-                SIO->period = 16;
+            if (!mTimingIsScheduled(Timing, &SIO->@event) && SIO->remainingBits != 0) {
+                Console.WriteLine($"XXXXX 0x{SIO->pendingSB.ToString("X2")}, {SIO->remainingBits} bits remaining");
+                mTimingSchedule(Timing, &SIO->@event, SIO->period);
+                mTimingSchedule(Timing, DequeueEvent, SIO->period);
+                return;
             }
 
-            mTimingSchedule(Timing, DequeueEvent, 1024);
+            if (Queue.Count > 0 && SIO->remainingBits == 0) {
+                byte data = Queue.Dequeue();
+                if (LogData)
+                    Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
+                SIO->pendingSB = data;
+                GBSIOWriteSC(SIO, 0x83); // ShiftClock, ClockSpeed, -, -, -, -, -, Enable
+            }
+
+            mTimingSchedule(Timing, DequeueEvent, Math.Max(1, SIO->period * 32));
         }
 
         public void Dispose() {
