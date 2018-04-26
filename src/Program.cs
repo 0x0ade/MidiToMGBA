@@ -77,13 +77,15 @@ namespace MidiToMGBA {
                 Console.WriteLine("Setting up mGBA link");
                 using (MGBALink link = new MGBALink()) {
                     Console.WriteLine($"Connecting to MIDI input {inputId} {caps.name}");
-                    using (InputDevice input = new InputDevice(inputId, false, false)) {
+                    using (InputDevice input = new InputDevice(inputId, postEventsOnCreationContext: false, postDriverCallbackToDelegateQueue: true)) {
                         using (MidiToMGBABridge bridge = new MidiToMGBABridge(input, link)) {
                             Console.WriteLine($"Starting up mGBA, loading {rom}");
                             argsMGBA.Add(rom);
-                            Thread thread = new Thread(() => MGBA.MMain(argsMGBA.ToArray()));
+                            // Run mGBA in a separate thread to keep this thread functional.
+                            // Who knows what the .NET runtime is doing behind the scenes...
+                            Thread thread = new Thread(() => MGBA.mMain(argsMGBA.ToArray()));
                             thread.Start();
-                            while (thread.IsAlive) {
+                            while (thread.IsAlive && !input.IsDisposed) {
                                 Thread.Sleep(0);
                             }
                         }

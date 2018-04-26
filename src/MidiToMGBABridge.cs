@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using Sanford.Multimedia;
 
 namespace MidiToMGBA {
     public class MidiToMGBABridge : IDisposable {
@@ -19,6 +20,7 @@ namespace MidiToMGBA {
             Link = link;
 
             input.MessageReceived += HandleMIDI;
+            input.Error += HandleMIDIError;
 
             input.StartRecording();
         }
@@ -31,10 +33,16 @@ namespace MidiToMGBA {
             }
         }
 
+        private void HandleMIDIError(object sender, ErrorEventArgs e) {
+            Console.WriteLine("MIDI error!");
+            Console.WriteLine(e.Error);
+            Dispose();
+        }
+
         public void Dispose() {
-            Input?.StopRecording();
-            Input?.Dispose();
-            Link?.Dispose();
+            Input.StopRecording();
+            Input.Dispose();
+            Link.Dispose();
         }
 
     }

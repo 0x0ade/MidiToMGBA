@@ -14,7 +14,7 @@ namespace MidiToMGBA {
         [DllImport(libmgbasdl, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mSDLMain")]
         private static extern int INTERNAL_mSDLMain(int argc, byte** argv);
         private delegate int d_mSDLMain(int argc, byte** argv);
-        public static void MMain(params string[] args) {
+        public static void mMain(params string[] args) {
             IntPtr* argv = (IntPtr*) Marshal.AllocHGlobal(IntPtr.Size * args.Length + 1);
             argv[0] = Marshal.StringToHGlobalAnsi(Assembly.GetEntryAssembly().Location);
             for (int i = 0; i < args.Length; i++)
@@ -33,25 +33,266 @@ namespace MidiToMGBA {
                 throw new Exception($"mGBA exit code {code}");
         }
 
-        public struct TimingEvent {
+        #region mTiming
+
+        public struct mTimingEvent {
             public void* context;
             // void (*callback)(struct mTiming*, void* context, uint32_t);
-            public IntPtr callback;
+            public delegate void d_callback(mTiming* timing, void* context, uint when);
+            public IntPtr _callback;
+            public d_callback callback {
+                get {
+                    if (_callback == IntPtr.Zero)
+                        return null;
+                    return (d_callback) Marshal.GetDelegateForFunctionPointer(_callback, typeof(d_callback));
+                }
+                set {
+                    if (value == null) {
+                        _callback = IntPtr.Zero;
+                        return;
+                    }
+                    _callback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
             public char* name;
             public uint when;
             public uint priority;
 
-            public TimingEvent* next;
+            public mTimingEvent* next;
         }
 
-        public struct Timing {
-            public TimingEvent* root;
-            public TimingEvent* reroot;
+        public struct mTiming {
+            public mTimingEvent* root;
+            public mTimingEvent* reroot;
 
             public uint masterCycles;
             public int* relativeCycles;
             public int* nextEvent;
         }
+
+        [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mTimingSchedule")]
+        private extern static void INTERNAL_mTimingSchedule(IntPtr timing, IntPtr @event, int when);
+        public static void mTimingSchedule(mTiming* timing, mTimingEvent* @event, int when) => INTERNAL_mTimingSchedule((IntPtr) timing, (IntPtr) @event, when);
+
+        #endregion
+
+        #region mCoreThread
+
+        // typedef void (*ThreadCallback)(struct mCoreThread* threadContext);
+        public delegate void ThreadCallback(mCoreThread* threadContext);
+
+        public struct mLogger {
+            // void (*log)(struct mLogger*, int category, enum mLogLevel level, const char* format, va_list args);
+            public IntPtr log;
+	        public IntPtr filter; // struct mLogFilter*
+        }
+
+        public struct mThreadLogger {
+	        public mLogger d;
+	        public mCoreThread* p;
+        }
+
+        public struct mCoreThread {
+	        // Input
+	        public IntPtr core; // struct mCore*
+
+	        public mThreadLogger logger;
+            public IntPtr _startCallback;
+            public ThreadCallback startCallback {
+                get {
+                    if (_startCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_startCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _startCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _startCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public IntPtr _resetCallback;
+            public ThreadCallback resetCallback {
+                get {
+                    if (_resetCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_resetCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _resetCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _resetCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public IntPtr _cleanCallback;
+            public ThreadCallback cleanCallback {
+                get {
+                    if (_cleanCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_cleanCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _cleanCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _cleanCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public IntPtr _frameCallback;
+            public ThreadCallback frameCallback {
+                get {
+                    if (_frameCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_frameCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _frameCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _frameCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public IntPtr _sleepCallback;
+            public ThreadCallback sleepCallback {
+                get {
+                    if (_sleepCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_sleepCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _sleepCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _sleepCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public IntPtr _pauseCallback;
+            public ThreadCallback pauseCallback {
+                get {
+                    if (_pauseCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_pauseCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _pauseCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _pauseCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public IntPtr _unpauseCallback;
+            public ThreadCallback unpauseCallback {
+                get {
+                    if (_unpauseCallback == IntPtr.Zero)
+                        return null;
+                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_unpauseCallback, typeof(ThreadCallback));
+                }
+                set {
+                    if (value == null) {
+                        _unpauseCallback = IntPtr.Zero;
+                        return;
+                    }
+                    _unpauseCallback = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+            public void* userData;
+            public delegate void d_run(mCoreThread* driver);
+            public IntPtr _run;
+            public d_run run {
+                get {
+                    if (_run == IntPtr.Zero)
+                        return null;
+                    return (d_run) Marshal.GetDelegateForFunctionPointer(_run, typeof(d_run));
+                }
+                set {
+                    if (value == null) {
+                        _run = IntPtr.Zero;
+                        return;
+                    }
+                    _run = Marshal.GetFunctionPointerForDelegate(value);
+                }
+            }
+
+            public IntPtr impl; // struct mCoreThreadInternal*
+        }
+
+        #endregion
+
+
+        #region mSDLPlayer
+
+        public struct CircleBuffer {
+            public void* data;
+            public IntPtr capacity;
+            public IntPtr size;
+            public void* readPtr;
+            public void* writePtr;
+        }
+
+        public struct mRumble {
+            // void (*setRumble)(struct mRumble*, int enable);
+            public IntPtr setRumble;
+        }
+
+        public struct mRotationSource {
+            // void (*sample)(struct mRotationSource*);
+            public IntPtr sample;
+
+            // int32_t (*readTiltX)(struct mRotationSource*);
+            public IntPtr readTiltX;
+            // int32_t (*readTiltY)(struct mRotationSource*);
+            public IntPtr readTiltY;
+
+            // int32_t(*readGyroZ)(struct mRotationSource*);
+            public IntPtr readGyroZ;
+        }
+
+        public struct mSDLPlayer {
+            public IntPtr playerId;
+            public IntPtr bindings;
+            public IntPtr joystick;
+            public IntPtr window;
+            public int fullscreen;
+            public int windowUpdated;
+
+            public struct mSDLRumble {
+                public mRumble d;
+                public IntPtr p;
+
+                public int level;
+                public float activeLevel;
+                public CircleBuffer history;
+            }
+            public mSDLRumble rumble;
+
+            public struct mSDLRotation {
+                public mRotationSource d;
+                public IntPtr p;
+
+                // Tilt
+                public int axisX;
+                public int axisY;
+
+                // Gyro
+                public int gyroX;
+                public int gyroY;
+                public float gyroSensitivity;
+                public CircleBuffer zHistory;
+                public int oldX;
+                public int oldY;
+                public float zDelta;
+            }
+            public mSDLRotation rotation;
+        }
+
+        #endregion
 
         #region GBSIO
 
@@ -84,9 +325,15 @@ namespace MidiToMGBA {
             public IntPtr _init;
             public d_init init {
                 get {
+                    if (_init == IntPtr.Zero)
+                        return null;
                     return (d_init) Marshal.GetDelegateForFunctionPointer(_init, typeof(d_init));
                 }
                 set {
+                    if (value == null) {
+                        _init = IntPtr.Zero;
+                        return;
+                    }
                     _init = Marshal.GetFunctionPointerForDelegate(value);
                 }
             }
@@ -95,9 +342,15 @@ namespace MidiToMGBA {
             public IntPtr _deinit;
             public d_deinit deinit {
                 get {
+                    if (_deinit == IntPtr.Zero)
+                        return null;
                     return (d_deinit) Marshal.GetDelegateForFunctionPointer(_deinit, typeof(d_deinit));
                 }
                 set {
+                    if (value == null) {
+                        _deinit = IntPtr.Zero;
+                        return;
+                    }
                     _deinit = Marshal.GetFunctionPointerForDelegate(value);
                 }
             }
@@ -106,9 +359,15 @@ namespace MidiToMGBA {
             public IntPtr _writeSB;
             public d_writeSB writeSB {
                 get {
+                    if (_writeSB == IntPtr.Zero)
+                        return null;
                     return (d_writeSB) Marshal.GetDelegateForFunctionPointer(_writeSB, typeof(d_writeSB));
                 }
                 set {
+                    if (value == null) {
+                        _writeSB = IntPtr.Zero;
+                        return;
+                    }
                     _writeSB = Marshal.GetFunctionPointerForDelegate(value);
                 }
             }
@@ -118,9 +377,15 @@ namespace MidiToMGBA {
             public IntPtr _writeSC;
             public d_writeSC writeSC {
                 get {
+                    if (_writeSC == IntPtr.Zero)
+                        return null;
                     return (d_writeSC) Marshal.GetDelegateForFunctionPointer(_writeSC, typeof(d_writeSC));
                 }
                 set {
+                    if (value == null) {
+                        _writeSC = IntPtr.Zero;
+                        return;
+                    }
                     _writeSC = Marshal.GetFunctionPointerForDelegate(value);
                 }
             }
@@ -129,7 +394,7 @@ namespace MidiToMGBA {
         public struct GBSIO {
             public IntPtr p;
 
-            public TimingEvent @event;
+            public mTimingEvent @event;
 
             public GBSIODriver* driver;
 
@@ -144,7 +409,7 @@ namespace MidiToMGBA {
 
         #region Lockstep
 
-        public enum LockstepPhase {
+        public enum mLockstepPhase {
 	        TRANSFER_IDLE = 0,
 	        TRANSFER_STARTING,
 	        TRANSFER_STARTED,
@@ -152,9 +417,9 @@ namespace MidiToMGBA {
 	        TRANSFER_FINISHED
         }
 
-        public struct Lockstep {
+        public struct mLockstep {
             public int attached;
-            public LockstepPhase transferActive;
+            public mLockstepPhase transferActive;
 	        public int transferCycles;
 
             // bool (*signal)(struct mLockstep*, unsigned mask);
@@ -175,14 +440,14 @@ namespace MidiToMGBA {
 
         [DllImport(libmgba, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mLockstepInit")]
         private static extern void INTERNAL_mLockstepInit(IntPtr lockstep);
-        public static void LockstepInit(Lockstep* lockstep) => INTERNAL_mLockstepInit((IntPtr) lockstep);
+        public static void mLockstepInit(mLockstep* lockstep) => INTERNAL_mLockstepInit((IntPtr) lockstep);
 
         #endregion
 
         #region GBSIOLockstep
 
         public struct GBSIOLockstep {
-            public Lockstep d;
+            public mLockstep d;
             // GBSIOLockstepNode* players[MAX_GBS];
             // Blame C#, not me. -ade
             public GBSIOLockstepNode* player1;
@@ -195,7 +460,7 @@ namespace MidiToMGBA {
         public struct GBSIOLockstepNode {
             public GBSIODriver d;
 	        public GBSIOLockstep* p;
-	        public TimingEvent @event;
+	        public mTimingEvent @event;
 
             public volatile int nextEvent;
             public int eventDiff;
@@ -203,7 +468,7 @@ namespace MidiToMGBA {
             public bool transferFinished;
             // #ifndef NDEBUG
             public int transferId;
-            public LockstepPhase phase;
+            public mLockstepPhase phase;
             // #endif
         }
 
