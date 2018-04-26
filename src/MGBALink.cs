@@ -88,20 +88,20 @@ namespace MidiToMGBA {
             Queue.Enqueue(data);
         }
 
+        // FIXME: Schedule Dequeue to sync up with actual SB / SC read-writes.
         private static mTimingEvent.d_callback inst_Dequeue;
         private static GCHandle handle_Dequeue;
         private static void Dequeue(mTiming* timing, void* context, uint cyclesLate) {
             if (SIO->remainingBits != 0 && !mTimingIsScheduled(Timing, &SIO->@event)) {
                 // Link unstable - scheduled _GBSIOProcessEvents got lost.
                 Console.WriteLine($"XXXXX 0x{SIO->pendingSB.ToString("X2")}, {SIO->remainingBits} bits remaining");
-                /*
                 while (SIO->remainingBits > 0) {
                     _GBSIOProcessEvents((IntPtr) Timing, (IntPtr) SIO, 0);
                     if (mTimingIsScheduled(Timing, &SIO->@event))
                         mTimingDeschedule(Timing, &SIO->@event);
                 }
-                */
-                mTimingSchedule(Timing, &SIO->@event, 0);
+                // mTimingSchedule(Timing, &SIO->@event, SIO->period);
+                // GBSIOWriteSC(SIO, 0x83);
 
             } else {
                 // Link stable.
