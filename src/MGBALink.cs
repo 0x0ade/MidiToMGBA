@@ -23,9 +23,9 @@ namespace MidiToMGBA {
         public static Queue<byte> Queue = new Queue<byte>();
 
         public static bool LogData = false;
-        public readonly static int SyncSIODefault = 16;
+        public readonly static int SyncSIODefault = 512;
         public static int SyncSIO = SyncSIODefault;
-        public readonly static int SyncWaitDefault = 16;
+        public readonly static int SyncWaitDefault = 64;
         public static int SyncWait = SyncSIODefault;
         public readonly static uint AudioBuffersDefault = 1024;
         public static uint AudioBuffers = AudioBuffersDefault;
