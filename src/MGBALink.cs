@@ -17,8 +17,7 @@ namespace MidiToMGBA {
 
         public static mTiming* Timing;
         public static GBSIO* SIO;
-
-        public static mTimingEvent* DequeueEvent;
+        public static GBSIODriver* Driver;
 
         public static Queue<byte> Queue = new Queue<byte>();
 
@@ -47,7 +46,7 @@ namespace MidiToMGBA {
                 );
                 orig_GBSIODeinit = h_GBSIODeinit.GenerateTrampoline<d_GBSIODeinit>();
 
-                // Hook mTimingInit (called via non-exported GBInit) to set up any timing-related stuff.
+                // Hook mTimingInit (called via non-exported GBInit) to set up any timing-related stuff and the driver.
                 h_mTimingInit = new NativeDetour(
                     libmgba.GetFunction("mTimingInit"),
                     typeof(MGBALink).GetMethod("mTimingInit", BindingFlags.NonPublic | BindingFlags.Static)
@@ -69,16 +68,15 @@ namespace MidiToMGBA {
                 );
                 orig_mSDLAttachPlayer = h_mSDLAttachPlayer.GenerateTrampoline<d_mSDLAttachPlayer>();
 
-                // Setup the dequeueing event.
-                DequeueEvent = (mTimingEvent*) Marshal.AllocHGlobal(sizeof(mTimingEvent));
+                // Setup the custom GBSIODriver, responsible for syncing dequeues.
+                Driver = (GBSIODriver*) Marshal.AllocHGlobal(Marshal.SizeOf(typeof(GBSIODriver)));
                 // Slow but functional zeroing.
                 for (int i = 0; i < sizeof(mTimingEvent); i++)
-                    *((byte*) ((IntPtr) DequeueEvent + i)) = 0x00;
-                DequeueEvent->context = (void*) IntPtr.Zero;
-                DequeueEvent->name = (byte*) Marshal.StringToHGlobalAnsi("MidiToGBG Data Dequeue");
-                DequeueEvent->callback = inst_Dequeue = Dequeue;
-                handle_Dequeue = GCHandle.Alloc(inst_Dequeue);
-                DequeueEvent->priority = 0x0ade;
+                    Driver->p = (GBSIO*) IntPtr.Zero;
+                Driver->init = PinnedPtr<GBSIODriver.d_init>(DriverInit);
+                Driver->deinit = PinnedPtr<GBSIODriver.d_deinit>(DriverDeinit);
+                Driver->writeSB = PinnedPtr<GBSIODriver.d_writeSB>(DriverWriteSB);
+                Driver->writeSC = PinnedPtr<GBSIODriver.d_writeSC>(DriverWriteSC);
             }
 
             Links.Add(this);
@@ -88,36 +86,6 @@ namespace MidiToMGBA {
             if (LogData)
                 Console.WriteLine($"->O   0x{data.ToString("X2")} #{Queue.Count}");
             Queue.Enqueue(data);
-        }
-
-        // FIXME: Schedule Dequeue to sync up with actual SB / SC read-writes.
-        private static mTimingEvent.d_callback inst_Dequeue;
-        private static GCHandle handle_Dequeue;
-        private static void Dequeue(mTiming* timing, void* context, uint cyclesLate) {
-            if (SIO->remainingBits != 0 && !mTimingIsScheduled(Timing, &SIO->@event)) {
-                // Link unstable - scheduled _GBSIOProcessEvents got lost.
-                Console.WriteLine($"XXXXX 0x{SIO->pendingSB.ToString("X2")}, {SIO->remainingBits} bits remaining");
-                while (SIO->remainingBits > 0) {
-                    _GBSIOProcessEvents((IntPtr) Timing, (IntPtr) SIO, 0);
-                    if (mTimingIsScheduled(Timing, &SIO->@event))
-                        mTimingDeschedule(Timing, &SIO->@event);
-                }
-                // mTimingSchedule(Timing, &SIO->@event, SIO->period);
-                // GBSIOWriteSC(SIO, 0x83);
-
-            } else {
-                // Link stable.
-                if (SIO->remainingBits == 0 && Queue.Count > 0) {
-                    byte data = Queue.Dequeue();
-                    if (LogData)
-                        Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
-                    SIO->pendingSB = data;
-                    GBSIOWriteSC(SIO, 0x83); // ShiftClock, ClockSpeed, -, -, -, -, -, Enable
-                }
-            }
-
-            // Reschedule the Dequeue event.
-            mTimingSchedule(Timing, DequeueEvent, Math.Max(1, SIO->period * DequeueSync));
         }
 
         public void Dispose() {
@@ -152,23 +120,62 @@ namespace MidiToMGBA {
             Timing = (mTiming*) IntPtr.Zero;
             SIO = (GBSIO*) IntPtr.Zero;
 
-            Marshal.FreeHGlobal((IntPtr) DequeueEvent->name);
-            Marshal.FreeHGlobal((IntPtr) DequeueEvent);
-            DequeueEvent = (mTimingEvent*) IntPtr.Zero;
+            Marshal.FreeHGlobal((IntPtr) Driver);
+            Driver = (GBSIODriver*) IntPtr.Zero;
         }
 
         #region Delegate Hooks
 
         private delegate void d_mSDLRunLoop(IntPtr rendererPtr, IntPtr userPtr);
         private static d_mSDLRunLoop orig_mSDLRunLoop;
-        private static d_mSDLRunLoop inst_mSDLRunLoop;
-        private static GCHandle handle_mSDLRunLoop;
         private static void mSDLRunLoop(IntPtr rendererPtr, IntPtr userPtr) {
             Console.WriteLine($"mSDLRunLoop, renderer @ 0x{rendererPtr.ToString("X16")}, user @ 0x{userPtr.ToString("X16")}");
 
-            mTimingSchedule(Timing, DequeueEvent, 0);
-
             orig_mSDLRunLoop(rendererPtr, userPtr);
+        }
+
+        #endregion
+
+        #region Driver
+
+        private static bool DriverInit(GBSIODriver* driver) {
+            Console.WriteLine("DRIVR +");
+            return true;
+        }
+
+        private static void DriverDeinit(GBSIODriver* driver) {
+            Console.WriteLine("DRIVR -");
+        }
+
+        private static void DriverWriteSB(GBSIODriver* driver, byte value) {
+            Console.WriteLine($"DRIVR SB 0x{value.ToString("X2")}");
+        }
+
+        private static byte DriverWriteSC(GBSIODriver* driver, byte value) {
+            if ((value & 0x80) == 0x80) {
+                // Enabled, feed data.
+                bool write = Queue.Count > 0;
+                if (write) {
+                    byte data = Queue.Dequeue();
+                    if (LogData)
+                        Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
+                    SIO->pendingSB = data;
+                } else {
+                    SIO->pendingSB = 0x00;
+                }
+
+                if ((value & 0x01) != 0x01) {
+                    // ShiftClock not enabled - enforce our own clocking.
+                    SIO->remainingBits = 8;
+                    mTimingSchedule(Timing, &SIO->@event, SIO->period);
+                }
+
+            } else {
+                Console.WriteLine($"DRIVR SC 0x{value.ToString("X2")}");
+            }
+
+            // Note: Value currently unused by GBSIOWriteSC, but python binding returns input.
+            return value;
         }
 
         #endregion
@@ -209,6 +216,7 @@ namespace MidiToMGBA {
 
             Timing = (mTiming*) timingPtr;
 
+            GBSIOSetDriver(SIO, Driver);
         }
 
         private static NativeDetour h__GBSIOProcessEvents;
@@ -235,14 +243,29 @@ namespace MidiToMGBA {
             // This fixes all other managed threads hanging after a while.
             if (orig_mSDLRunLoop == null) {
                 orig_mSDLRunLoop = (d_mSDLRunLoop) Marshal.GetDelegateForFunctionPointer(*((IntPtr*) runloop), typeof(d_mSDLRunLoop));
-                *((IntPtr*) runloop) = Marshal.GetFunctionPointerForDelegate(inst_mSDLRunLoop = mSDLRunLoop);
-                handle_mSDLRunLoop = GCHandle.Alloc(inst_mSDLRunLoop);
+                *((IntPtr*) runloop) = PinnedPtr<d_mSDLRunLoop>(mSDLRunLoop);
             }
 
             return rv;
         }
 
-    #endregion
+        #endregion
+
+        #region Delegate pinning helper
+
+        private static HashSet<Delegate> Delegates = new HashSet<Delegate>();
+        private static HashSet<GCHandle> DelegateHandles = new HashSet<GCHandle>();
+
+        private static IntPtr PinnedPtr<T>(T del) where T : class {
+            if (!typeof(Delegate).IsAssignableFrom(typeof(T)))
+                throw new ArgumentException("Generic parameter must be delegate type");
+            Delegate d = del as Delegate;
+            Delegates.Add(d);
+            DelegateHandles.Add(GCHandle.Alloc(d));
+            return Marshal.GetFunctionPointerForDelegate(d);
+        }
+
+        #endregion
 
     }
 }

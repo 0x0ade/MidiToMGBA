@@ -43,21 +43,7 @@ namespace MidiToMGBA {
             public void* context;
             // void (*callback)(struct mTiming*, void* context, uint32_t);
             public delegate void d_callback(mTiming* timing, void* context, uint cyclesLate);
-            public IntPtr _callback;
-            public d_callback callback {
-                get {
-                    if (_callback == IntPtr.Zero)
-                        return null;
-                    return (d_callback) Marshal.GetDelegateForFunctionPointer(_callback, typeof(d_callback));
-                }
-                set {
-                    if (value == null) {
-                        _callback = IntPtr.Zero;
-                        return;
-                    }
-                    _callback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr callback;
             public byte* name;
             public uint when;
             public uint priority;
@@ -110,128 +96,16 @@ namespace MidiToMGBA {
 	        public IntPtr core; // struct mCore*
 
 	        public mThreadLogger logger;
-            public IntPtr _startCallback;
-            public ThreadCallback startCallback {
-                get {
-                    if (_startCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_startCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _startCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _startCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
-            public IntPtr _resetCallback;
-            public ThreadCallback resetCallback {
-                get {
-                    if (_resetCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_resetCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _resetCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _resetCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
-            public IntPtr _cleanCallback;
-            public ThreadCallback cleanCallback {
-                get {
-                    if (_cleanCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_cleanCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _cleanCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _cleanCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
-            public IntPtr _frameCallback;
-            public ThreadCallback frameCallback {
-                get {
-                    if (_frameCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_frameCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _frameCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _frameCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
-            public IntPtr _sleepCallback;
-            public ThreadCallback sleepCallback {
-                get {
-                    if (_sleepCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_sleepCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _sleepCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _sleepCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
-            public IntPtr _pauseCallback;
-            public ThreadCallback pauseCallback {
-                get {
-                    if (_pauseCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_pauseCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _pauseCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _pauseCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
-            public IntPtr _unpauseCallback;
-            public ThreadCallback unpauseCallback {
-                get {
-                    if (_unpauseCallback == IntPtr.Zero)
-                        return null;
-                    return (ThreadCallback) Marshal.GetDelegateForFunctionPointer(_unpauseCallback, typeof(ThreadCallback));
-                }
-                set {
-                    if (value == null) {
-                        _unpauseCallback = IntPtr.Zero;
-                        return;
-                    }
-                    _unpauseCallback = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr startCallback;
+            public IntPtr resetCallback;
+            public IntPtr cleanCallback;
+            public IntPtr frameCallback;
+            public IntPtr sleepCallback;
+            public IntPtr pauseCallback;
+            public IntPtr unpauseCallback;
             public void* userData;
             public delegate void d_run(mCoreThread* driver);
-            public IntPtr _run;
-            public d_run run {
-                get {
-                    if (_run == IntPtr.Zero)
-                        return null;
-                    return (d_run) Marshal.GetDelegateForFunctionPointer(_run, typeof(d_run));
-                }
-                set {
-                    if (value == null) {
-                        _run = IntPtr.Zero;
-                        return;
-                    }
-                    _run = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr run;
 
             public IntPtr impl; // struct mCoreThreadInternal*
         }
@@ -341,73 +215,17 @@ namespace MidiToMGBA {
 
             // public bool (*init)(struct GBSIODriver* driver);
             public delegate bool d_init(GBSIODriver* driver);
-            public IntPtr _init;
-            public d_init init {
-                get {
-                    if (_init == IntPtr.Zero)
-                        return null;
-                    return (d_init) Marshal.GetDelegateForFunctionPointer(_init, typeof(d_init));
-                }
-                set {
-                    if (value == null) {
-                        _init = IntPtr.Zero;
-                        return;
-                    }
-                    _init = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr init;
 	        // public void (*deinit)(struct GBSIODriver* driver);
             public delegate void d_deinit(GBSIODriver* driver);
-            public IntPtr _deinit;
-            public d_deinit deinit {
-                get {
-                    if (_deinit == IntPtr.Zero)
-                        return null;
-                    return (d_deinit) Marshal.GetDelegateForFunctionPointer(_deinit, typeof(d_deinit));
-                }
-                set {
-                    if (value == null) {
-                        _deinit = IntPtr.Zero;
-                        return;
-                    }
-                    _deinit = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr deinit;
             // public void (*writeSB)(struct GBSIODriver* driver, uint8_t value);
             public delegate void d_writeSB(GBSIODriver* driver, byte value);
-            public IntPtr _writeSB;
-            public d_writeSB writeSB {
-                get {
-                    if (_writeSB == IntPtr.Zero)
-                        return null;
-                    return (d_writeSB) Marshal.GetDelegateForFunctionPointer(_writeSB, typeof(d_writeSB));
-                }
-                set {
-                    if (value == null) {
-                        _writeSB = IntPtr.Zero;
-                        return;
-                    }
-                    _writeSB = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr writeSB;
 
             // public uint8_t(*writeSC)(struct GBSIODriver* driver, uint8_t value);
             public delegate byte d_writeSC(GBSIODriver* driver, byte value);
-            public IntPtr _writeSC;
-            public d_writeSC writeSC {
-                get {
-                    if (_writeSC == IntPtr.Zero)
-                        return null;
-                    return (d_writeSC) Marshal.GetDelegateForFunctionPointer(_writeSC, typeof(d_writeSC));
-                }
-                set {
-                    if (value == null) {
-                        _writeSC = IntPtr.Zero;
-                        return;
-                    }
-                    _writeSC = Marshal.GetFunctionPointerForDelegate(value);
-                }
-            }
+            public IntPtr writeSC;
         }
 
         public struct GBSIO {
