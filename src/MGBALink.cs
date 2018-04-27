@@ -22,8 +22,12 @@ namespace MidiToMGBA {
         public static Queue<byte> Queue = new Queue<byte>();
 
         public static bool LogData = false;
-        public readonly static int DequeueSyncDefault = 32;
-        public static int DequeueSync = DequeueSyncDefault;
+        public readonly static uint DequeueSyncDefault = 32;
+        public static uint DequeueSync = DequeueSyncDefault;
+        public readonly static uint AudioBuffersDefault = 1024;
+        public static uint AudioBuffers = AudioBuffersDefault;
+        public readonly static uint SampleRateDefault = 48000; // mGBA defaults to 44100
+        public static uint SampleRate = SampleRateDefault;
 
         public MGBALink() {
             if (Links.Count == 0) {
@@ -53,12 +57,12 @@ namespace MidiToMGBA {
                 );
                 orig_mTimingInit = h_mTimingInit.GenerateTrampoline<d_mTimingInit>();
 
-                // Hook _GBSIOProcessEvents to... do nothing, for now.
-                h__GBSIOProcessEvents = new NativeDetour(
-                    libmgba.GetFunction("_GBSIOProcessEvents"),
-                    typeof(MGBALink).GetMethod("_GBSIOProcessEvents", BindingFlags.NonPublic | BindingFlags.Static)
+                // Hook mCoreConfigLoadDefaults to change the configs before loading them.
+                h_mCoreConfigLoadDefaults = new NativeDetour(
+                    libmgba.GetFunction("mCoreConfigLoadDefaults"),
+                    typeof(MGBALink).GetMethod("mCoreConfigLoadDefaults", BindingFlags.NonPublic | BindingFlags.Static)
                 );
-                orig__GBSIOProcessEvents = h__GBSIOProcessEvents.GenerateTrampoline<d__GBSIOProcessEvents>();
+                orig_mCoreConfigLoadDefaults = h_mCoreConfigLoadDefaults.GenerateTrampoline<d_mCoreConfigLoadDefaults>();
 
                 // Hook mSDLAttachPlayer to hook the renderer's runloop.
                 // This is required to fix any managed runtime <-> unmanaged state bugs.
@@ -67,6 +71,13 @@ namespace MidiToMGBA {
                     typeof(MGBALink).GetMethod("mSDLAttachPlayer", BindingFlags.NonPublic | BindingFlags.Static)
                 );
                 orig_mSDLAttachPlayer = h_mSDLAttachPlayer.GenerateTrampoline<d_mSDLAttachPlayer>();
+
+                // Hook mSDLInitAudio to force our own sample rate.
+                h_mSDLInitAudio = new NativeDetour(
+                    libmgbasdl.GetFunction("mSDLInitAudio"),
+                    typeof(MGBALink).GetMethod("mSDLInitAudio", BindingFlags.NonPublic | BindingFlags.Static)
+                );
+                orig_mSDLInitAudio = h_mSDLInitAudio.GenerateTrampoline<d_mSDLInitAudio>();
 
                 // Setup the custom GBSIODriver, responsible for syncing dequeues.
                 Driver = (GBSIODriver*) Marshal.AllocHGlobal(Marshal.SizeOf(typeof(GBSIODriver)));
@@ -109,9 +120,9 @@ namespace MidiToMGBA {
             h_mTimingInit.Free();
             h_mTimingInit = null;
 
-            h__GBSIOProcessEvents.Undo();
-            h__GBSIOProcessEvents.Free();
-            h__GBSIOProcessEvents = null;
+            h_mCoreConfigLoadDefaults.Undo();
+            h_mCoreConfigLoadDefaults.Free();
+            h_mCoreConfigLoadDefaults = null;
 
             h_mSDLAttachPlayer.Undo();
             h_mSDLAttachPlayer.Free();
@@ -154,20 +165,20 @@ namespace MidiToMGBA {
         private static byte DriverWriteSC(GBSIODriver* driver, byte value) {
             if ((value & 0x80) == 0x80) {
                 // Enabled, feed data.
-                bool write = Queue.Count > 0;
-                if (write) {
+                if (Queue.Count > 0) {
                     byte data = Queue.Dequeue();
                     if (LogData)
                         Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
                     SIO->pendingSB = data;
-                } else {
-                    SIO->pendingSB = 0x00;
                 }
 
                 if ((value & 0x01) != 0x01) {
                     // ShiftClock not enabled - enforce our own clocking.
+                    // Even reschedule the GBSIO handling event when pendingSB hasn't been updated.
+                    // This introduces a few glitches, but prevents the SIO loop from ever halting.
+                    // An alternative approach of manually rescheduling the event has caused more glitches.
                     SIO->remainingBits = 8;
-                    mTimingSchedule(Timing, &SIO->@event, SIO->period);
+                    mTimingSchedule(Timing, &SIO->@event, 0);
                 }
 
             } else {
@@ -219,12 +230,24 @@ namespace MidiToMGBA {
             GBSIOSetDriver(SIO, Driver);
         }
 
-        private static NativeDetour h__GBSIOProcessEvents;
-        private delegate void d__GBSIOProcessEvents(IntPtr timingPtr, IntPtr contextPtr, uint cyclesLate);
-        private static d__GBSIOProcessEvents orig__GBSIOProcessEvents;
-        private static void _GBSIOProcessEvents(IntPtr timingPtr, IntPtr contextPtr, uint cyclesLate) {
-            // Console.WriteLine($"_GBSIOProcessEvents, timing @ 0x{timingPtr.ToString("X16")}, context @ 0x{contextPtr.ToString("X16")}, cyclesLate: {cyclesLate}");
-            orig__GBSIOProcessEvents(timingPtr, contextPtr, cyclesLate);
+        private static NativeDetour h_mCoreConfigLoadDefaults;
+        private delegate void d_mCoreConfigLoadDefaults(IntPtr configPtr, IntPtr optsPtr);
+        private static d_mCoreConfigLoadDefaults orig_mCoreConfigLoadDefaults;
+        private static void mCoreConfigLoadDefaults(IntPtr configPtr, IntPtr optsPtr) {
+            Console.WriteLine($"mCoreConfigLoadDefaults, config @ 0x{configPtr.ToString("X16")}, opts @ 0x{optsPtr.ToString("X16")}");
+
+            mCoreOptions* opts = (mCoreOptions*) optsPtr;
+            opts->volume = 0x200; // Defaults to 0x100, which is quieter than BGB.
+            opts->audioSync = true;
+            opts->videoSync = false;
+            // opts->fpsTarget = float(GBA_ARM7TDMI_FREQUENCY) / float(VIDEO_TOTAL_LENGTH);
+            opts->fpsTarget = 0x1000000U / 280896F; // Defaults to 60F
+            opts->rewindEnable = false; // Defaults to true
+            opts->rewindSave = false; // Defaults to true
+            opts->audioBuffers = (IntPtr) AudioBuffers; // Defaults to 1024
+            opts->sampleRate = SampleRate; // Ignored by the SDL2 platform.
+
+            orig_mCoreConfigLoadDefaults(configPtr, optsPtr);
         }
 
         private static NativeDetour h_mSDLAttachPlayer;
@@ -247,6 +270,18 @@ namespace MidiToMGBA {
             }
 
             return rv;
+        }
+
+        private static NativeDetour h_mSDLInitAudio;
+        private delegate bool d_mSDLInitAudio(IntPtr eventsPtr, IntPtr playerPtr);
+        private static d_mSDLInitAudio orig_mSDLInitAudio;
+        private static bool mSDLInitAudio(IntPtr contextPtr, IntPtr threadContextPtr) {
+            Console.WriteLine($"mSDLInitAudio, context @ 0x{contextPtr.ToString("X16")}, threadContext @ 0x{threadContextPtr.ToString("X16")}");
+
+            // mSDLAudio starts with size_t samples, then unsigned sampleRate
+            *((uint*) (contextPtr + IntPtr.Size)) = SampleRate;
+
+            return orig_mSDLInitAudio(contextPtr, threadContextPtr);
         }
 
         #endregion

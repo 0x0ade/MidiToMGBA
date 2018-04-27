@@ -8,6 +8,11 @@
 :: --mgba-sdl is optional and defaults to libmgba-sdl.dll
 :: --log-data is optional, disabled by default, and triggers the verbose data log.
 :: --sync is optional and defaults to 32 - lower values introduce "misses", higher values increase latency.
+:: --buffersize is optional and defaults to 1024
+:: --samplerate is optional and defaults to 48000
+
+:: Note: A samplerate of 44100 kHz introduces pacing issues.
+:: Furthermore, if you want to use a lower samplerate, lower the buffer size.
 
 :: Example - connect "Some Cool Device" to pushpin:
 :: MidiToMGBA.exe --midi SomeCoolDevice --rom pushpin.gbc

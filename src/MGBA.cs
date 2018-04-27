@@ -282,50 +282,42 @@ namespace MidiToMGBA {
 
         #endregion
 
-        #region GBSIOLockstep
+        #region mCoreOptions
 
-        public struct GBSIOLockstep {
-            public mLockstep d;
-            // GBSIOLockstepNode* players[MAX_GBS];
-            // Blame C#, not me. -ade
-            public GBSIOLockstepNode* player1;
-            public GBSIOLockstepNode* player2;
+        public struct mCoreOptions {
+            public byte* bios;
+            public bool skipBios;
+            public bool useBios;
+            public int logLevel;
+            public int frameskip;
+            public bool rewindEnable;
+            public int rewindBufferCapacity;
+            public bool rewindSave;
+            public float fpsTarget;
+            public IntPtr audioBuffers;
+            public uint sampleRate;
 
-            public fixed byte pendingSB[MAX_GBS];
-            public bool masterClaimed;
-        }
+            public int fullscreen;
+            public int width;
+            public int height;
+            public bool lockAspectRatio;
+            public bool lockIntegerScaling;
+            public bool resampleVideo;
+            public bool suspendScreensaver;
+            public byte* shader;
 
-        public struct GBSIOLockstepNode {
-            public GBSIODriver d;
-	        public GBSIOLockstep* p;
-	        public mTimingEvent @event;
+            public byte* savegamePath;
+            public byte* savestatePath;
+            public byte* screenshotPath;
+            public byte* patchPath;
+            public byte* cheatsPath;
 
-            public volatile int nextEvent;
-            public int eventDiff;
-            public int id;
-            public bool transferFinished;
-            // #ifndef NDEBUG
-            public int transferId;
-            public mLockstepPhase phase;
-            // #endif
-        }
+            public int volume;
+            public bool mute;
 
-        private delegate void d_GBSIOLockstepInit(IntPtr lockstep);
-        [DynamicDllImport(libmgba, "GBSIOLockstepInit")]
-        private readonly static d_GBSIOLockstepInit INTERNAL_GBSIOLockstepInit;
-        public static void GBSIOLockstepInit(GBSIOLockstep* lockstep) => INTERNAL_GBSIOLockstepInit((IntPtr) lockstep);
-        private delegate void d_GBSIOLockstepNodeCreate(IntPtr node);
-        [DynamicDllImport(libmgba, "GBSIOLockstepNodeCreate")]
-        private readonly static d_GBSIOLockstepNodeCreate INTERNAL_GBSIOLockstepNodeCreate;
-        public static void GBSIOLockstepNodeCreate(GBSIOLockstepNode* node) => INTERNAL_GBSIOLockstepNodeCreate((IntPtr) node);
-        private delegate bool d_GBSIOLockstepAttachNode(IntPtr lockstep, IntPtr node);
-        [DynamicDllImport(libmgba, "GBSIOLockstepAttachNode")]
-        private readonly static d_GBSIOLockstepAttachNode INTERNAL_GBSIOLockstepAttachNode;
-        public static bool GBSIOLockstepAttachNode(GBSIOLockstep* lockstep, GBSIOLockstepNode* node) => INTERNAL_GBSIOLockstepAttachNode((IntPtr) lockstep, (IntPtr) node);
-        private delegate void d_GBSIOLockstepDetachNode(IntPtr lockstep, IntPtr node);
-        [DynamicDllImport(libmgba, "GBSIOLockstepDetachNode")]
-        private readonly static d_GBSIOLockstepDetachNode INTERNAL_GBSIOLockstepDetachNode;
-        public static void GBSIOLockstepDetachNode(GBSIOLockstep* lockstep, GBSIOLockstepNode* node) => INTERNAL_GBSIOLockstepDetachNode((IntPtr) lockstep, (IntPtr) node);
+            public bool videoSync;
+            public bool audioSync;
+        };
 
         #endregion
 

@@ -63,8 +63,14 @@ namespace MidiToMGBA {
                 } else if (arg == "--log-data") {
                     MGBALink.LogData = true;
                 } else if (arg == "--sync") {
-                    if (!int.TryParse(argsQueue.Dequeue(), out MGBALink.DequeueSync))
+                    if (!uint.TryParse(argsQueue.Dequeue(), out MGBALink.DequeueSync))
                         MGBALink.DequeueSync = MGBALink.DequeueSyncDefault;
+                } else if (arg == "--buffersize") {
+                    if (!uint.TryParse(argsQueue.Dequeue(), out MGBALink.AudioBuffers))
+                        MGBALink.AudioBuffers = MGBALink.AudioBuffersDefault;
+                } else if (arg == "--samplerate") {
+                    if (!uint.TryParse(argsQueue.Dequeue(), out MGBALink.SampleRate))
+                        MGBALink.SampleRate = MGBALink.SampleRateDefault;
 
                 } else {
                     argsMGBA.Add(arg);
