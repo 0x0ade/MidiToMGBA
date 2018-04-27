@@ -23,7 +23,7 @@ namespace MidiToMGBA {
         public static Queue<byte> Queue = new Queue<byte>();
 
         public static bool LogData = false;
-        public readonly static int SyncSIODefault = 512;
+        public readonly static int SyncSIODefault = 16;
         public static int SyncSIO = SyncSIODefault;
         public readonly static int SyncWaitDefault = 64;
         public static int SyncWait = SyncSIODefault;
@@ -109,7 +109,9 @@ namespace MidiToMGBA {
         public void Send(byte data) {
             if (LogData)
                 Console.WriteLine($"->O   0x{data.ToString("X2")} #{Queue.Count}");
-            Queue.Enqueue(data);
+            lock (Queue) {
+                Queue.Enqueue(data);
+            }
         }
 
         public void Dispose() {
@@ -153,10 +155,13 @@ namespace MidiToMGBA {
         }
 
         private static bool Dequeue() {
-            if (Queue.Count == 0)
-                return false;
+            byte data;
+            lock (Queue) {
+                if (Queue.Count == 0)
+                    return false;
+                data = Queue.Dequeue();
+            }
 
-            byte data = Queue.Dequeue();
             if (LogData)
                 Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
             SIO->pendingSB = data;
@@ -223,7 +228,7 @@ namespace MidiToMGBA {
                 // Game waiting for transfer from outside - dequeue or kick off QueueCheck loop.
                 if (!Dequeue()) {
                     // We haven't dequeued anything - schedule QueueCheck.
-                    mTimingSchedule(Timing, QueueCheckEvent, 0);
+                    mTimingSchedule(Timing, QueueCheckEvent, SyncWait);
                 }
             } else {
                 // Unexpected SC
