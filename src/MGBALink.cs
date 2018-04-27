@@ -18,12 +18,15 @@ namespace MidiToMGBA {
         public static mTiming* Timing;
         public static GBSIO* SIO;
         public static GBSIODriver* Driver;
+        public static mTimingEvent* QueueCheckEvent;
 
         public static Queue<byte> Queue = new Queue<byte>();
 
         public static bool LogData = false;
-        public readonly static uint DequeueSyncDefault = 8;
-        public static uint DequeueSync = DequeueSyncDefault;
+        public readonly static int SyncSIODefault = 16;
+        public static int SyncSIO = SyncSIODefault;
+        public readonly static int SyncWaitDefault = 16;
+        public static int SyncWait = SyncSIODefault;
         public readonly static uint AudioBuffersDefault = 1024;
         public static uint AudioBuffers = AudioBuffersDefault;
         public readonly static uint SampleRateDefault = 48000; // mGBA defaults to 44100
@@ -88,6 +91,16 @@ namespace MidiToMGBA {
                 Driver->deinit = PinnedPtr<GBSIODriver.d_deinit>(DriverDeinit);
                 Driver->writeSB = PinnedPtr<GBSIODriver.d_writeSB>(DriverWriteSB);
                 Driver->writeSC = PinnedPtr<GBSIODriver.d_writeSC>(DriverWriteSC);
+
+                // Setup the queue check event.
+                QueueCheckEvent = (mTimingEvent*) Marshal.AllocHGlobal(sizeof(mTimingEvent));
+                // Slow but functional zeroing.
+                for (int i = 0; i < sizeof(mTimingEvent); i++)
+                    *((byte*) ((IntPtr) QueueCheckEvent + i)) = 0x00;
+                QueueCheckEvent->context = (void*) IntPtr.Zero;
+                QueueCheckEvent->name = (byte*) Marshal.StringToHGlobalAnsi("MidiToGBG Queue Check");
+                QueueCheckEvent->callback = PinnedPtr<mTimingEvent.d_callback>(QueueCheck);
+                QueueCheckEvent->priority = 0x30;
             }
 
             Links.Add(this);
@@ -133,6 +146,47 @@ namespace MidiToMGBA {
 
             Marshal.FreeHGlobal((IntPtr) Driver);
             Driver = (GBSIODriver*) IntPtr.Zero;
+
+            Marshal.FreeHGlobal((IntPtr) QueueCheckEvent->name);
+            Marshal.FreeHGlobal((IntPtr) QueueCheckEvent);
+            QueueCheckEvent = (mTimingEvent*) IntPtr.Zero;
+        }
+
+        private static bool Dequeue() {
+            if (Queue.Count == 0)
+                return false;
+
+            byte data = Queue.Dequeue();
+            if (LogData)
+                Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
+            SIO->pendingSB = data;
+            SIO->remainingBits = 8;
+
+            // We've successfully supplied a byte - force mGBA to read it.
+
+            // Execute _GBSIOProcessEvents to force-update SB
+
+            // Note: One should probably write to SIO->p->memory.io and execute the interrupt directly.
+            // _GBSIOProcessEvents is rather meant to run scheduedly on the "master" GB.
+            // Meanwhile, mGB makes the GB (and thus mGBA) act like a "slave".
+            // Unfortunately, AFAIK, mGBA doesn't offer any way to supply a link clock signal for the slave.
+            // This means that the link is currently limited to blindly feeding data into mGBA.
+
+            while (SIO->remainingBits > 1) {
+                _GBSIOProcessEvents(Timing, SIO, 0);
+                // _GBSIOProcessEvents reschedules itself - deschedule, or risk hanging mGBA.
+                mTimingDeschedule(Timing, &SIO->@event);
+            }
+            mTimingSchedule(Timing, &SIO->@event, SyncSIO);
+
+            return true;
+        }
+
+        private static void QueueCheck(mTiming* timing, void* context, uint cyclesLate) {
+            if (Dequeue())
+                return;
+
+            mTimingSchedule(Timing, QueueCheckEvent, SyncWait);
         }
 
         #region Delegate Hooks
@@ -163,42 +217,16 @@ namespace MidiToMGBA {
         }
 
         private static byte DriverWriteSC(GBSIODriver* driver, byte value) {
-            if ((value & 0x80) == 0x80) {
-                // Enabled, feed data.
-                if (Queue.Count > 0) {
-                    byte data = Queue.Dequeue();
-                    if (LogData)
-                        Console.WriteLine($"  O-> 0x{data.ToString("X2")}, {Queue.Count} left");
-                    SIO->pendingSB = data;
-                }
-
-                if ((value & 0x01) != 0x01) {
-                    // ShiftClock not enabled - enforce our own clocking.
-                    // This introduces a few glitches, but prevents the SIO loop from ever halting.
-                    // An alternative approach of manually rescheduling the event has caused more glitches.
-
-                    // Note that this needs to happen even if no data has been dequeued, to prevent this "loop" from halting.
-                    // FIXME: Corruption when queue reaches end.
-
-                    // Old method: Simply schedule _GBSIOProcessEvents
-                    // Introduces a few misses, but good enough:tm:.
-                    /*
-                    SIO->remainingBits = 8;
-                    mTimingSchedule(Timing, &SIO->@event, 0);
-                    */
-
-                    // New method: Execute _GBSIOProcessEvents for the first 7 bits, then schedule _GBSIOProcessEvents
-                    // This seems to match what BGB more closely.
-                    SIO->remainingBits = 8;
-                    while (SIO->remainingBits > 1) {
-                        _GBSIOProcessEvents(Timing, SIO, 0);
-                        // _GBSIOProcessEvents reschedules itself - deschedule, or risk hanging mGBA.
-                        mTimingDeschedule(Timing, &SIO->@event);
-                    }
-                    // Fun fact: A sync multiplier of 32 causes this to behave like MidiToBGB, minus the "timestamp desync".
-                    mTimingSchedule(Timing, &SIO->@event, (int) (SIO->period * DequeueSyncDefault));
+            // 0x80: Transfer enabled
+            // 0x01: Shift Clock, must be "external" (0)
+            if ((value & 0x80) == 0x80 && (value & 0x01) != 0x01) {
+                // Game waiting for transfer from outside - dequeue or kick off QueueCheck loop.
+                if (!Dequeue()) {
+                    // We haven't dequeued anything - schedule QueueCheck.
+                    mTimingSchedule(Timing, QueueCheckEvent, 0);
                 }
             } else {
+                // Unexpected SC
                 Console.WriteLine($"DRIVR SC 0x{value.ToString("X2")}");
             }
 
