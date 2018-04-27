@@ -209,7 +209,11 @@ namespace MidiToMGBA {
         [DynamicDllImport(libmgba, "GBSIOWriteSB")]
         private readonly static d_GBSIOWriteSB INTERNAL_GBSIOWriteSB;
         public static void GBSIOWriteSB(GBSIO* sio, byte sb) => INTERNAL_GBSIOWriteSB((IntPtr) sio, sb);
-        
+        private delegate void d__GBSIOProcessEvents(IntPtr timing, IntPtr context, uint cyclesLate);
+        [DynamicDllImport(libmgba, "_GBSIOProcessEvents")]
+        private readonly static d__GBSIOProcessEvents INTERNAL__GBSIOProcessEvents;
+        public static void _GBSIOProcessEvents(mTiming* timing, void* context, uint cyclesLate) => INTERNAL__GBSIOProcessEvents((IntPtr) timing, (IntPtr) context, cyclesLate);
+
         public struct GBSIODriver {
             public GBSIO* p;
 

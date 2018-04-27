@@ -22,7 +22,7 @@ namespace MidiToMGBA {
         public static Queue<byte> Queue = new Queue<byte>();
 
         public static bool LogData = false;
-        public readonly static uint DequeueSyncDefault = 32;
+        public readonly static uint DequeueSyncDefault = 8;
         public static uint DequeueSync = DequeueSyncDefault;
         public readonly static uint AudioBuffersDefault = 1024;
         public static uint AudioBuffers = AudioBuffersDefault;
@@ -174,13 +174,30 @@ namespace MidiToMGBA {
 
                 if ((value & 0x01) != 0x01) {
                     // ShiftClock not enabled - enforce our own clocking.
-                    // Even reschedule the GBSIO handling event when pendingSB hasn't been updated.
                     // This introduces a few glitches, but prevents the SIO loop from ever halting.
                     // An alternative approach of manually rescheduling the event has caused more glitches.
+
+                    // Note that this needs to happen even if no data has been dequeued, to prevent this "loop" from halting.
+                    // FIXME: Corruption when queue reaches end.
+
+                    // Old method: Simply schedule _GBSIOProcessEvents
+                    // Introduces a few misses, but good enough:tm:.
+                    /*
                     SIO->remainingBits = 8;
                     mTimingSchedule(Timing, &SIO->@event, 0);
-                }
+                    */
 
+                    // New method: Execute _GBSIOProcessEvents for the first 7 bits, then schedule _GBSIOProcessEvents
+                    // This seems to match what BGB more closely.
+                    SIO->remainingBits = 8;
+                    while (SIO->remainingBits > 1) {
+                        _GBSIOProcessEvents(Timing, SIO, 0);
+                        // _GBSIOProcessEvents reschedules itself - deschedule, or risk hanging mGBA.
+                        mTimingDeschedule(Timing, &SIO->@event);
+                    }
+                    // Fun fact: A sync multiplier of 32 causes this to behave like MidiToBGB, minus the "timestamp desync".
+                    mTimingSchedule(Timing, &SIO->@event, (int) (SIO->period * DequeueSyncDefault));
+                }
             } else {
                 Console.WriteLine($"DRIVR SC 0x{value.ToString("X2")}");
             }

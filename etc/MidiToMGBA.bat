@@ -7,7 +7,7 @@
 :: --mgba is optional and defaults to libmgba.dll
 :: --mgba-sdl is optional and defaults to libmgba-sdl.dll
 :: --log-data is optional, disabled by default, and triggers the verbose data log.
-:: --sync is optional and defaults to 32 - lower values introduce "misses", higher values increase latency.
+:: --sync is optional and defaults to 8 - lower values introduce "misses", higher values increase latency.
 :: --buffersize is optional and defaults to 1024
 :: --samplerate is optional and defaults to 48000
 
